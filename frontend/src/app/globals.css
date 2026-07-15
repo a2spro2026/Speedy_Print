@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --color-surface: #f5f7fa;
+  --color-ink: #111827;
+  --color-muted: #6b7280;
+  --color-brand: #2563eb;
+  --color-violet: #7c3aed;
+  --color-amber: #f59e0b;
+  --color-pink: #ec4899;
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+}
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface font-sans text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+}
+
+/* Cartes analytiques — totalement immobiles */
+.stat-card-fixed,
+.stat-card-fixed:hover,
+.stat-card-fixed:focus,
+.stat-card-fixed:active {
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+  rotate: none !important;
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+
+.stat-cards-bar {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+}

@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --color-brand-50: #eff6ff;
+    --color-brand-100: #dbeafe;
+    --color-brand-200: #bfdbfe;
+    --color-brand-300: #93c5fd;
+    --color-brand-400: #60a5fa;
+    --color-brand-500: #2f6fed;
+    --color-brand-600: #1e56d9;
+    --color-brand-700: #1a45b0;
+    --color-brand-800: #1a3a8c;
+    --color-brand-900: #1a326f;
+    --color-ink: #1e293b;
+    --color-muted: #64748b;
+    --color-surface: #f4f7fb;
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-surface font-sans text-ink antialiased;
+    }
+}
+
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 bg-brand-600 text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 border border-slate-200 bg-white text-ink hover:bg-slate-50;
+    }
+
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 bg-red-600 text-white hover:bg-red-700;
+    }
+
+    .btn-ghost {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 text-muted hover:bg-slate-100 hover:text-ink;
+    }
+
+    .input {
+        @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+    }
+
+    .label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+
+    .card {
+        @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+    }
+
+    .badge {
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    }
+
+    .badge-draft { @apply bg-slate-100 text-slate-700; }
+    .badge-sent { @apply bg-blue-100 text-blue-700; }
+    .badge-paid { @apply bg-emerald-100 text-emerald-700; }
+    .badge-partial { @apply bg-amber-100 text-amber-800; }
+    .badge-overdue { @apply bg-red-100 text-red-700; }
+    .badge-cancelled { @apply bg-slate-200 text-slate-600; }
+
+    .table-wrap {
+        @apply overflow-x-auto;
+    }
+
+    .data-table {
+        @apply w-full min-w-[640px] text-left text-sm;
+    }
+
+    .data-table thead {
+        @apply border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-wide text-muted;
+    }
+
+    .data-table th {
+        @apply px-4 py-3 font-semibold;
+    }
+
+    .data-table td {
+        @apply border-b border-slate-100 px-4 py-3.5 align-middle;
+    }
+
+    .data-table tbody tr {
+        @apply transition hover:bg-brand-50/40;
+    }
+
+    .sidebar-link {
+        @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white;
+    }
+
+    .sidebar-link.active {
+        @apply bg-brand-600 text-white shadow-lg shadow-brand-900/30;
+    }
+
+    .stat-card {
+        @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm relative overflow-hidden p-5;
+    }
+
+    .login-glass {
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.35);
+    }
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+    }
+}
