@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "npm --prefix frontend run dev -- --port=3000 --hostname=127.0.0.1",
+        "dev:ui": "npm --prefix frontend run dev -- --port=3000 --hostname=127.0.0.1",
+        "dev:vite": "vite"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

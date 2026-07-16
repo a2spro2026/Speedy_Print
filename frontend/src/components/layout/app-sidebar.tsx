@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeftRight,
   Banknote,
   Building2,
   ChevronDown,
@@ -22,6 +21,8 @@ import {
   Users,
   Wallet,
   Warehouse,
+  Wrench,
+  Activity,
 } from "lucide-react";
 import { SpeedyLogo } from "@/components/brand/speedy-logo";
 import { cn } from "@/lib/utils";
@@ -73,8 +74,9 @@ const groups: NavGroup[] = [
     accent: "from-amber-500 to-orange-600",
     children: [
       { label: "Fiche Produit", href: "/dashboard/stock/produits", icon: Package },
+      { label: "Fiche Service", href: "/dashboard/stock/services", icon: Wrench },
       { label: "Balance Stock", href: "/dashboard/stock/balance", icon: Scale },
-      { label: "Mouvement Stock", href: "/dashboard/stock/mouvements", icon: ArrowLeftRight },
+      { label: "Etat Service", href: "/dashboard/stock/etat-services", icon: Activity },
     ],
   },
   {

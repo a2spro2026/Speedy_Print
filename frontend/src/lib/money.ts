@@ -20,3 +20,10 @@ export function toMoneyInput(value: number | string | null | undefined): string 
   if (!Number.isFinite(n)) return "0.00";
   return n.toFixed(2);
 }
+
+/** Couleurs montants (facture achat/vente, règlements) */
+export const moneyTone = {
+  facture: "font-bold text-red-600 tabular-nums",
+  paye: "font-bold text-green-600 tabular-nums",
+  solde: "font-bold text-amber-500 tabular-nums",
+} as const;

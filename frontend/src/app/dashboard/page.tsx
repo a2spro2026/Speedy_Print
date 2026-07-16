@@ -32,7 +32,7 @@ type StatCard = {
 const stats: StatCard[] = [
   {
     label: "Total Achats",
-    value: formatMoney(8240),
+    value: formatMoney(0),
     icon: ShoppingCart,
     gradient: "from-[#2563EB] via-[#3B82F6] to-[#60A5FA]",
     glow: "shadow-md",
@@ -40,7 +40,7 @@ const stats: StatCard[] = [
   },
   {
     label: "Total Ventes",
-    value: formatMoney(15980),
+    value: formatMoney(0),
     icon: TrendingUp,
     gradient: "from-[#059669] via-[#10B981] to-[#34D399]",
     glow: "shadow-md",
@@ -48,7 +48,7 @@ const stats: StatCard[] = [
   },
   {
     label: "Total Charges",
-    value: formatMoney(3450),
+    value: formatMoney(0),
     icon: Receipt,
     gradient: "from-[#DC2626] via-[#F43F5E] to-[#FB7185]",
     glow: "shadow-md",
@@ -56,7 +56,7 @@ const stats: StatCard[] = [
   },
   {
     label: "Caisse",
-    value: formatMoney(4120),
+    value: formatMoney(0),
     icon: Wallet,
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FBBF24]",
     glow: "shadow-md",
@@ -64,7 +64,7 @@ const stats: StatCard[] = [
   },
   {
     label: "Clients Actifs",
-    value: "24",
+    value: "0",
     icon: Users,
     gradient: "from-[#7C3AED] via-[#8B5CF6] to-[#A78BFA]",
     glow: "shadow-md",
@@ -72,63 +72,38 @@ const stats: StatCard[] = [
   },
 ];
 
-const achatsRecents = [
-  { numero: "FA-2026-0142", fournisseur: "Papeterie Atlas", date: "12/07/2026", montant: formatMoney(1240), statut: "Payée" },
-  { numero: "FA-2026-0141", fournisseur: "Encre & Co", date: "10/07/2026", montant: formatMoney(680.5), statut: "En attente" },
-  { numero: "FA-2026-0140", fournisseur: "Machine Print Pro", date: "08/07/2026", montant: formatMoney(3150), statut: "Payée" },
-  { numero: "FA-2026-0139", fournisseur: "Carton Plus", date: "05/07/2026", montant: formatMoney(420), statut: "Partielle" },
-  { numero: "FA-2026-0138", fournisseur: "Xerox Maroc", date: "02/07/2026", montant: formatMoney(890), statut: "Payée" },
+const MOIS = [
+  "Jan",
+  "Fév",
+  "Mar",
+  "Avr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Aoû",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Déc",
 ];
 
-const ventesRecentes = [
-  { numero: "FV-2026-0288", client: "Agence Nova Com", date: "13/07/2026", montant: formatMoney(2180), statut: "Payée" },
-  { numero: "FV-2026-0287", client: "Boulangerie Dupont", date: "11/07/2026", montant: formatMoney(345), statut: "Envoyée" },
-  { numero: "FV-2026-0286", client: "Tech Solutions SARL", date: "09/07/2026", montant: formatMoney(1560), statut: "Payée" },
-  { numero: "FV-2026-0285", client: "Mairie de Caluire", date: "06/07/2026", montant: formatMoney(4200), statut: "En retard" },
-  { numero: "FV-2026-0284", client: "Studio Lumière", date: "03/07/2026", montant: formatMoney(780), statut: "Payée" },
-];
-
-const chartData = [
-  { mois: "Jan", achats: 4200, ventes: 7800, charges: 2100 },
-  { mois: "Fév", achats: 3900, ventes: 7200, charges: 1950 },
-  { mois: "Mar", achats: 5100, ventes: 9100, charges: 2400 },
-  { mois: "Avr", achats: 4600, ventes: 8600, charges: 2200 },
-  { mois: "Mai", achats: 5800, ventes: 10200, charges: 2650 },
-  { mois: "Jun", achats: 5400, ventes: 9800, charges: 2500 },
-  { mois: "Jul", achats: 6200, ventes: 11500, charges: 2800 },
-  { mois: "Aoû", achats: 4800, ventes: 8900, charges: 2300 },
-  { mois: "Sep", achats: 5500, ventes: 10600, charges: 2550 },
-  { mois: "Oct", achats: 6100, ventes: 11200, charges: 2700 },
-  { mois: "Nov", achats: 6700, ventes: 12400, charges: 2900 },
-  { mois: "Déc", achats: 7200, ventes: 13800, charges: 3100 },
-];
-
-function statutClass(statut: string) {
-  switch (statut) {
-    case "Payée":
-      return "bg-emerald-100 text-emerald-700";
-    case "En attente":
-    case "Envoyée":
-      return "bg-blue-100 text-blue-700";
-    case "Partielle":
-      return "bg-amber-100 text-amber-800";
-    case "En retard":
-      return "bg-rose-100 text-rose-700";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
-}
+const chartData = MOIS.map((mois) => ({
+  mois,
+  achats: 0,
+  ventes: 0,
+  charges: 0,
+}));
 
 function InvoiceTable({
   title,
   accent,
   headers,
-  rows,
+  emptyLabel,
 }: {
   title: string;
   accent: string;
   headers: string[];
-  rows: Array<Record<string, string>>;
+  emptyLabel: string;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
@@ -149,30 +124,14 @@ function InvoiceTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.numero}
-                className="border-b border-slate-50 last:border-0"
+            <tr>
+              <td
+                colSpan={headers.length}
+                className="px-4 py-10 text-center text-sm text-muted"
               >
-                <td className="px-4 py-3 font-semibold text-brand">
-                  {row.numero}
-                </td>
-                <td className="px-4 py-3 text-slate-700">
-                  {row.fournisseur || row.client}
-                </td>
-                <td className="px-4 py-3 text-slate-500">{row.date}</td>
-                <td className="px-4 py-3 text-right font-bold text-slate-800">
-                  {row.montant}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statutClass(row.statut)}`}
-                  >
-                    {row.statut}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                {emptyLabel}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -222,7 +181,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Diagramme annuel */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -261,7 +219,8 @@ export default function DashboardPage() {
                 tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                domain={[0, 10]}
+                tickFormatter={(v) => `${v}`}
               />
               <Tooltip
                 cursor={{ fill: "rgba(148,163,184,0.12)" }}
@@ -282,19 +241,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Tableaux */}
       <div className="grid gap-6 xl:grid-cols-2">
         <InvoiceTable
           title="Les 5 Dernières Factures d'achat"
           accent="bg-gradient-to-r from-blue-50 to-white"
           headers={["N°", "Fournisseur", "Date", "Montant", "Statut"]}
-          rows={achatsRecents}
+          emptyLabel="Aucune facture d'achat pour le moment."
         />
         <InvoiceTable
           title="Les 5 Dernières Factures de Vente"
           accent="bg-gradient-to-r from-emerald-50 to-white"
           headers={["N°", "Client", "Date", "Montant", "Statut"]}
-          rows={ventesRecentes}
+          emptyLabel="Aucune facture de vente pour le moment."
         />
       </div>
     </div>
