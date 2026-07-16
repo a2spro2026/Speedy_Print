@@ -11,7 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
 import { loadClients, type Client } from "@/lib/clients";
+import {
+  ensureCatalogItem,
+  inferCatalogKind,
+  type CatalogKind,
+} from "@/lib/ensure-catalog-item";
 import { loadProduits, type Produit } from "@/lib/produits";
+import { loadServices, type Service } from "@/lib/services";
 import { printFactureVente } from "@/lib/print-facture-vente";
 import {
   BASES_FACTURE,
@@ -39,6 +45,7 @@ import {
 } from "@/lib/factures-vente";
 
 const ligneSchema = z.object({
+  kind: z.enum(["produit", "service"]),
   ref: z.string().optional(),
   designation: z.string().min(1, "Désignation obligatoire"),
   qte: z.string().min(1),
@@ -96,6 +103,7 @@ function num(v: string): number {
 
 function ligneToForm(l: ReturnType<typeof emptyLigne>) {
   return {
+    kind: inferCatalogKind(l.ref) as CatalogKind,
     ref: l.ref,
     designation: l.designation,
     qte: String(l.qte),
@@ -104,6 +112,17 @@ function ligneToForm(l: ReturnType<typeof emptyLigne>) {
     remise: toMoneyInput(l.remise),
     tva: toMoneyInput(l.tva),
     sousTotal: toMoneyInput(l.sousTotal),
+  };
+}
+
+function refreshCatalog() {
+  return {
+    produits: [...loadProduits()].sort((a, b) =>
+      a.designation.localeCompare(b.designation, "fr")
+    ),
+    services: [...loadServices()].sort((a, b) =>
+      a.designation.localeCompare(b.designation, "fr")
+    ),
   };
 }
 
@@ -137,6 +156,7 @@ export default function FactureVentePage() {
   const [list, setList] = useState<FactureVente[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [produits, setProduits] = useState<Produit[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [mode, setMode] = useState<FormMode | null>(null);
   const [ready, setReady] = useState(false);
   const [printTarget, setPrintTarget] = useState<FactureVente | null>(null);
@@ -182,11 +202,9 @@ export default function FactureVentePage() {
   useEffect(() => {
     setList(loadFacturesVente());
     setClients(loadClients());
-    setProduits(
-      [...loadProduits()].sort((a, b) =>
-        a.designation.localeCompare(b.designation, "fr")
-      )
-    );
+    const cat = refreshCatalog();
+    setProduits(cat.produits);
+    setServices(cat.services);
     setReady(true);
   }, []);
 
@@ -269,23 +287,41 @@ export default function FactureVentePage() {
     setValue("ice", f?.ice ?? "");
   }
 
-  function onProduitChange(index: number, ref: string) {
-    if (readOnly) return;
-    if (!ref) {
+  function applyCatalogMatch(index: number, value: string) {
+    const name = value.trim().toLowerCase();
+    if (!name) {
       setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-      setValue(`lignes.${index}.designation`, "", { shouldValidate: true });
+      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
       return;
     }
-    const p = produits.find((x) => x.ref === ref);
-    if (!p) return;
-    setValue(`lignes.${index}.ref`, p.ref, { shouldValidate: true });
-    setValue(`lignes.${index}.designation`, p.designation, {
-      shouldValidate: true,
-    });
-    setValue(`lignes.${index}.unite`, "U", { shouldValidate: true });
-    setValue(`lignes.${index}.prixU`, toMoneyInput(p.prixVente), {
-      shouldValidate: true,
-    });
+    const s = services.find((x) => x.designation.trim().toLowerCase() === name);
+    if (s) {
+      setValue(`lignes.${index}.kind`, "service", { shouldValidate: true });
+      setValue(`lignes.${index}.ref`, s.ref, { shouldValidate: true });
+      setValue(`lignes.${index}.unite`, s.unite || "U", { shouldValidate: true });
+      setValue(`lignes.${index}.prixU`, toMoneyInput(s.prixVente), {
+        shouldValidate: true,
+      });
+      return;
+    }
+    const p = produits.find((x) => x.designation.trim().toLowerCase() === name);
+    if (p) {
+      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
+      setValue(`lignes.${index}.ref`, p.ref, { shouldValidate: true });
+      setValue(`lignes.${index}.unite`, "U", { shouldValidate: true });
+      setValue(`lignes.${index}.prixU`, toMoneyInput(p.prixVente), {
+        shouldValidate: true,
+      });
+      return;
+    }
+    setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
+    setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
+  }
+
+  function onDesignationInput(index: number, value: string) {
+    if (readOnly) return;
+    setValue(`lignes.${index}.designation`, value, { shouldValidate: true });
+    applyCatalogMatch(index, value);
   }
 
   function onDelete(f: FactureVente) {
@@ -317,8 +353,15 @@ export default function FactureVentePage() {
         tva,
         typeFacture: type,
       });
+      const ensured = ensureCatalogItem({
+        kind: l.kind,
+        designation: l.designation,
+        prixU,
+        unite: l.unite,
+        ref: l.ref,
+      });
       return {
-        ref: (l.ref ?? "").trim(),
+        ref: ensured.ref,
         designation: l.designation.trim(),
         qte,
         unite: l.unite,
@@ -328,6 +371,10 @@ export default function FactureVentePage() {
         sousTotal,
       };
     });
+
+    const cat = refreshCatalog();
+    setProduits(cat.produits);
+    setServices(cat.services);
 
     const row: FactureVente = {
       id: values.id || nextFactureVenteId(list),
@@ -585,25 +632,33 @@ export default function FactureVentePage() {
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <input
-                          type="hidden"
-                          {...register(`lignes.${index}.designation`)}
+                        <Input
+                          list={`fv-designation-${index}`}
+                          {...register(`lignes.${index}.designation`, {
+                            onChange: (e) =>
+                              onDesignationInput(index, e.target.value),
+                          })}
+                          readOnly={readOnly}
+                          placeholder="Saisir la désignation…"
+                          className={`${readOnly ? inputReadonly : inputSheet} w-full text-left`}
+                          autoComplete="off"
                         />
-                        <select
-                          className={`${selectSheet} text-center`}
-                          disabled={readOnly}
-                          value={watchLignes?.[index]?.ref || ""}
-                          onChange={(e) =>
-                            onProduitChange(index, e.target.value)
-                          }
-                        >
-                          <option value="">— Produit —</option>
-                          {produits.map((p) => (
-                            <option key={p.ref} value={p.ref}>
-                              {p.designation}
+                        <datalist id={`fv-designation-${index}`}>
+                          {produits.map((item) => (
+                            <option key={item.ref} value={item.designation}>
+                              Produit
                             </option>
                           ))}
-                        </select>
+                          {services.map((item) => (
+                            <option key={item.ref} value={item.designation}>
+                              Service
+                            </option>
+                          ))}
+                        </datalist>
+                        <input
+                          type="hidden"
+                          {...register(`lignes.${index}.kind`)}
+                        />
                         {errors.lignes?.[index]?.designation && (
                           <p className="mt-0.5 text-[10px] text-rose-600">
                             {errors.lignes[index]?.designation?.message}

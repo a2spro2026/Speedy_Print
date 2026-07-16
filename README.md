@@ -9,7 +9,7 @@ Application de facturation / gestion imprimerie.
 | **Local (seul lien valide)** | **http://127.0.0.1:3000** |
 | Production | https://speedyprint.a2spr.com |
 
-**Ne jamais ouvrir** `:6500`, `:8000`, `:8001`, `:8080` — ce sont d’anciennes UI Laravel / Vite, pas SpeedyPrint.
+**Interdit :** ne jamais lancer `php artisan serve` ni ouvrir `:6500` / `:8000` / `:8001` / `:8080` — ce n’est pas SpeedyPrint.
 
 ## Démarrer en local
 
@@ -30,5 +30,5 @@ Compte démo : `admin@speedyprint.fr` / `password`
 
 ## Stack
 
-- **UI** : Next.js 15 (`frontend/`)
-- **API / backend** : Laravel 12 (racine) — optionnel en local via `composer run dev:api` (API seule, pas l’UI)
+- **UI** : Next.js 15 (`frontend/`) — seul point d’entrée local : **http://127.0.0.1:3000**
+- **API / backend** : Laravel 12 (racine), pas pour l’interface
