@@ -50,9 +50,9 @@ export function buildBalanceStock(): LigneBalanceStock[] {
         achat,
         vente,
         stockFinal,
-        statut: p.actif === false ? "Inactif" : "Actif",
+        statut: (p.actif === false ? "Inactif" : "Actif") as StatutProduit,
         etat: etatStock(stockFinal),
-      };
+      } satisfies LigneBalanceStock;
     })
     .sort((a, b) => a.ref.localeCompare(b.ref, undefined, { numeric: true }));
 }
