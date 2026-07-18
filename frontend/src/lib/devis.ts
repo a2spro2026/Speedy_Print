@@ -104,14 +104,25 @@ export function nextDevisId(existing: Devis[]): string {
   return padId(max + 1);
 }
 
-/** N° devis affiché : Dev0001, Dev0002… */
+/** Normalise un n° devis vers le format 0001-Dev. */
+export function normalizeNumeroDevis(raw: string): string {
+  const s = (raw || "").trim();
+  const m =
+    /^(\d+)-Dev$/i.exec(s) ||
+    /^Dev(\d+)$/i.exec(s);
+  if (m) return `${String(Number(m[1])).padStart(4, "0")}-Dev`;
+  return s;
+}
+
+/** N° devis affiché : 0001-Dev, 0002-Dev… */
 export function nextNumeroDevis(existing: Devis[]): string {
   let max = 0;
   for (const d of existing) {
-    const m = /^Dev(\d+)$/i.exec((d.numeroDevis || "").trim());
+    const raw = normalizeNumeroDevis(d.numeroDevis || "");
+    const m = /^(\d+)-Dev$/i.exec(raw);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `Dev${String(max + 1).padStart(4, "0")}`;
+  return `${String(max + 1).padStart(4, "0")}-Dev`;
 }
 
 export function calcSousTotal(args: {
@@ -163,7 +174,8 @@ export function loadDevis(): Devis[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.map((d) => ({
       ...d,
-      base: "Devis",
+      base: "Devis" as const,
+      numeroDevis: normalizeNumeroDevis(d.numeroDevis || ""),
       typeReglement: normalizeTypeReglement(d.typeReglement),
       lignes:
         Array.isArray(d.lignes) && d.lignes.length > 0 ? d.lignes : [emptyLigne()],

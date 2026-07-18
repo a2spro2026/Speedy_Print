@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, ArrowRightLeft, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Eye, ArrowRightLeft, FileText, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/ensure-catalog-item";
 import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
+import { printDevis } from "@/lib/print-devis";
 import {
   factureFromDevis,
   isDevisConverted,
@@ -38,6 +39,7 @@ import {
   moisOptions,
   nextDevisId,
   nextNumeroDevis,
+  normalizeNumeroDevis,
   saveDevis,
   todayISO,
   totalDevis,
@@ -145,69 +147,13 @@ function toFormValues(f: Devis): FormValues {
   };
 }
 
-function printDevis(f: Devis) {
-  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1000");
-  if (!win) {
-    toast.error("Impossible d'ouvrir la fenêtre d'impression.");
-    return;
+function onPrintDevis(d: Devis, withLetterhead: boolean) {
+  const ok = printDevis(d, { withLetterhead });
+  if (!ok) {
+    toast.error(
+      "Impossible d'ouvrir la fenêtre d'impression. Autorisez les pop-ups pour ce site."
+    );
   }
-
-  const head = [
-    ["Mois", moisLabel(f.mois)],
-    ["Date", formatDateFR(f.date)],
-    ["N°", f.numeroDevis],
-    ["ID Client", f.clientId],
-    ["Nom Client", f.nomClient],
-    ["Type Règlement", f.typeReglement],
-    ["Échéance", formatDateFR(f.echeance)],
-    ["Montant", formatMoney(f.montantFacture)],
-  ]
-    .map(
-      ([k, v]) =>
-        `<tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid #e5e7eb">${k}</th><td style="padding:6px 10px;border-bottom:1px solid #e5e7eb">${v}</td></tr>`
-    )
-    .join("");
-
-  const lines = f.lignes
-    .map(
-      (l) =>
-        `<tr>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${l.ref || "—"}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee">${l.designation}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${l.qte}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${l.unite}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:right">${formatMoney(l.prixU)}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${l.remise}%</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${l.tva}%</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${formatMoney(l.sousTotal)}</td>
-        </tr>`
-    )
-    .join("");
-
-  win.document.write(`<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"/>
-<title>Devis ${f.numeroDevis}</title>
-<style>
-  body{font-family:Georgia,'Times New Roman',serif;color:#111;padding:28px;max-width:900px;margin:0 auto}
-  h1{font-size:22px;margin:0 0 4px}
-  h2{font-size:14px;margin:20px 0 8px}
-  p{color:#666;margin:0 0 16px;font-size:14px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  @media print{body{padding:0}}
-</style></head><body>
-  <h1>SpeedyPrint — Devis</h1>
-  <p>${f.numeroDevis} · ${f.nomClient}</p>
-  <table>${head}</table>
-  <h2>Lignes</h2>
-  <table>
-    <thead><tr>
-      <th>Réf</th><th>Désignation</th><th>Qté</th><th>Unité</th><th>Prix/U</th><th>Remise</th><th>TVA</th><th>Sous-Total</th>
-    </tr></thead>
-    <tbody>${lines}</tbody>
-  </table>
-  <script>window.onload=function(){window.print()}</script>
-</body></html>`);
-  win.document.close();
 }
 
 export default function DevisPage() {
@@ -218,6 +164,7 @@ export default function DevisPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [mode, setMode] = useState<FormMode | null>(null);
   const [ready, setReady] = useState(false);
+  const [printTarget, setPrintTarget] = useState<Devis | null>(null);
   const moisOpts = useMemo(() => moisOptions(), []);
 
   const {
@@ -235,7 +182,7 @@ export default function DevisPage() {
       date: todayISO(),
       typeFacture: "TTC",
       base: "Devis",
-      numeroDevis: "Dev0001",
+      numeroDevis: "0001-Dev",
       id: "DV-0001",
       clientId: "",
       nomClient: "",
@@ -258,7 +205,9 @@ export default function DevisPage() {
   }, [watchLignes]);
 
   useEffect(() => {
-    setList(loadDevis());
+    const devis = loadDevis();
+    setList(devis);
+    saveDevis(devis);
     setClients(loadClients());
     const cat = refreshCatalog();
     setProduits(cat.produits);
@@ -304,12 +253,13 @@ export default function DevisPage() {
 
   function openNouveau() {
     const d = todayISO();
+    const numero = nextNumeroDevis(list) || "0001-Dev";
     reset({
       mois: moisFromDate(d),
       date: d,
       typeFacture: "TTC",
       base: "Devis",
-      numeroDevis: nextNumeroDevis(list),
+      numeroDevis: numero,
       id: nextDevisId(list),
       clientId: "",
       nomClient: "",
@@ -457,7 +407,7 @@ export default function DevisPage() {
       date: values.date,
       typeFacture: type,
       base: values.base,
-      numeroDevis: values.numeroDevis.trim(),
+      numeroDevis: normalizeNumeroDevis(values.numeroDevis.trim() || nextNumeroDevis(list)),
       clientId: values.clientId,
       nomClient: values.nomClient.trim(),
       ice: (values.ice ?? "").trim(),
@@ -494,6 +444,7 @@ export default function DevisPage() {
   }
 
   return (
+    <>
     <div className="space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
       {!mode && (
         <div className="flex justify-end">
@@ -539,7 +490,7 @@ export default function DevisPage() {
               <Field label="N°" error={errors.numeroDevis?.message}>
                 <Input
                   {...register("numeroDevis")}
-                  placeholder="Dev0001"
+                  placeholder="0001-Dev"
                   readOnly={readOnly}
                   className={readOnly ? inputReadonly : inputShell}
                   autoFocus={!readOnly}
@@ -885,7 +836,7 @@ export default function DevisPage() {
                         </ActionBtn>
                         <ActionBtn
                           label="Imprimer"
-                          onClick={() => printDevis(f)}
+                          onClick={() => setPrintTarget(f)}
                           className="text-slate-700 hover:bg-white"
                         >
                           <Printer className="h-4 w-4" />
@@ -915,6 +866,94 @@ export default function DevisPage() {
       </div>
       )}
     </div>
+
+      {printTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="print-devis-title"
+          onClick={() => setPrintTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                <Printer className="h-4 w-4" />
+              </span>
+              <div>
+                <h2
+                  id="print-devis-title"
+                  className="text-base font-bold text-ink"
+                >
+                  Impression devis
+                </h2>
+                <p className="text-xs text-muted">
+                  {printTarget.numeroDevis} · {printTarget.nomClient}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 text-sm text-slate-600">
+              Choisissez le format d&apos;impression :
+            </p>
+
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
+                onClick={() => {
+                  const d = printTarget;
+                  setPrintTarget(null);
+                  onPrintDevis(d, true);
+                }}
+              >
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+                <span>
+                  <span className="block text-sm font-bold text-ink">
+                    Avec en-tête et pied de page
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Conception Speedy Print telle quelle
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
+                onClick={() => {
+                  const d = printTarget;
+                  setPrintTarget(null);
+                  onPrintDevis(d, false);
+                }}
+              >
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+                <span>
+                  <span className="block text-sm font-bold text-ink">
+                    Sans en-tête et pied de page
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Pour papier à en-tête déjà imprimé
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPrintTarget(null)}
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

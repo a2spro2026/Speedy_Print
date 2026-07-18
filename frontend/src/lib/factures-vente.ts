@@ -111,25 +111,20 @@ export function nextFactureVenteId(existing: FactureVente[]): string {
   return padId(max + 1);
 }
 
-/** Année courte pour le n° : 2026 → 26 */
-function yearSuffix(dateISO?: string): string {
-  const y = dateISO?.slice(0, 4) || String(new Date().getFullYear());
-  return y.slice(-2);
-}
-
-/** N° facture affiché : FC-26/0001, FC-26/0002… */
+/** N° facture affiché : 0001-Fact, 0002-Fact… */
 export function nextNumeroFacture(
   existing: FactureVente[],
-  dateISO?: string
+  _dateISO?: string
 ): string {
-  const yy = yearSuffix(dateISO);
-  const re = new RegExp(`^FC-${yy}/(\\d+)$`, "i");
   let max = 0;
   for (const f of existing) {
-    const m = re.exec((f.numeroFacture || "").trim());
+    const raw = (f.numeroFacture || "").trim();
+    const m =
+      /^(\d+)-Fact$/i.exec(raw) ||
+      /^FC-\d{2}\/(\d+)$/i.exec(raw);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `FC-${yy}/${String(max + 1).padStart(4, "0")}`;
+  return `${String(max + 1).padStart(4, "0")}-Fact`;
 }
 
 export function isDevisConverted(

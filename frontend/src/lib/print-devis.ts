@@ -1,9 +1,8 @@
 import { loadClients } from "@/lib/clients";
-import { formatDateFR, type FactureVente } from "@/lib/factures-vente";
+import { formatDateFR, type Devis } from "@/lib/devis";
 import { formatMoney } from "@/lib/money";
-import { loadReglementsClient } from "@/lib/reglements-client";
 
-/** Accent facture (totaux) — hors conception papier à en-tête. */
+/** Accent devis (totaux) — même famille que facture client. */
 const ACCENT = "#64748B";
 
 function escapeHtml(s: string): string {
@@ -18,7 +17,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function calcMontants(f: FactureVente): {
+function calcMontants(d: Devis): {
   ht: number;
   tva: number;
   ttc: number;
@@ -26,11 +25,11 @@ function calcMontants(f: FactureVente): {
 } {
   let ht = 0;
   let tva = 0;
-  for (const l of f.lignes ?? []) {
+  for (const l of d.lignes ?? []) {
     const qte = Number(l.qte) || 0;
     const prixU = Number(l.prixU) || 0;
     const remise = Number(l.remise) || 0;
-    const tvaPct = f.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0;
+    const tvaPct = d.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0;
     const brut = qte * prixU;
     const apresRemise = brut * (1 - Math.min(Math.max(remise, 0), 100) / 100);
     ht += apresRemise;
@@ -41,79 +40,49 @@ function calcMontants(f: FactureVente): {
 
   const rates = [
     ...new Set(
-      (f.lignes ?? [])
-        .map((l) => (f.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0))
+      (d.lignes ?? [])
+        .map((l) => (d.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0))
         .filter((r) => r > 0)
     ),
   ];
   const tvaLabel =
-    f.typeFacture === "Exonéré"
+    d.typeFacture === "Exonéré"
       ? "TVA (exonéré)"
       : rates.length === 1
         ? `TVA (${rates[0]}%)`
         : "TVA";
 
   const computed =
-    f.typeFacture === "HT" || f.typeFacture === "Exonéré"
+    d.typeFacture === "HT" || d.typeFacture === "Exonéré"
       ? ht
       : round2(ht + tva);
 
   return {
     ht,
     tva,
-    ttc: Number(f.montantFacture) || computed,
+    ttc: Number(d.montantFacture) || computed,
     tvaLabel,
   };
 }
 
-function clientInfo(f: FactureVente) {
-  const c = loadClients().find((x) => x.id === f.clientId);
+function clientInfo(d: Devis) {
+  const c = loadClients().find((x) => x.id === d.clientId);
   return {
-    nom: f.nomClient || "—",
+    nom: d.nomClient || "—",
     contact: c?.contact || "",
     ville: c?.ville || "",
-    ice: f.ice || c?.ice || "",
-    id: f.clientId || "",
+    ice: d.ice || c?.ice || "",
+    id: d.clientId || "",
   };
 }
 
-function paymentInfo(f: FactureVente): {
-  mode: string;
-  numero: string;
-  nomTire: string;
-  dateEncaisse: string;
-} {
-  const regs = loadReglementsClient()
-    .filter(
-      (r) =>
-        r.factureId === f.id ||
-        (r.refFacture && r.refFacture === f.numeroFacture)
-    )
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const r = regs[0];
-  if (r) {
-    return {
-      mode: r.modeReglement || f.typeReglement || "—",
-      numero: r.numeroRegl || "—",
-      nomTire: r.nomTire || "—",
-      dateEncaisse: r.dateEncaisse ? formatDateFR(r.dateEncaisse) : "—",
-    };
-  }
-  return {
-    mode: f.typeReglement || "—",
-    numero: "—",
-    nomTire: "—",
-    dateEncaisse: f.echeance ? formatDateFR(f.echeance) : "—",
-  };
-}
-
-function lignesHtml(f: FactureVente): string {
-  return (f.lignes ?? [])
+function lignesHtml(d: Devis): string {
+  return (d.lignes ?? [])
     .map((l, i) => {
       const qte = Number(l.qte) || 0;
       const prixU = Number(l.prixU) || 0;
       const remise = Number(l.remise) || 0;
-      const tva = f.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0;
+      const tva = d.typeFacture === "Exonéré" ? 0 : Number(l.tva) || 0;
       const brut = qte * prixU;
       const htLigne = round2(
         brut * (1 - Math.min(Math.max(remise, 0), 100) / 100)
@@ -121,11 +90,11 @@ function lignesHtml(f: FactureVente): string {
       return `<tr class="${i % 2 ? "alt" : ""}">
         <td class="c">${i + 1}</td>
         <td class="ref">${escapeHtml(l.ref || "—")}</td>
-        <td class="desig">
-          ${escapeHtml(l.designation || "—")}
-          ${l.unite ? `<div class="sub">Unité : ${escapeHtml(l.unite)}</div>` : ""}
-          ${remise > 0 ? `<div class="sub">Remise ${remise}%</div>` : ""}
-        </td>
+        <td class="desig">${escapeHtml(l.designation || "")}${
+          l.unite
+            ? `<div class="sub">${escapeHtml(String(l.unite))}</div>`
+            : ""
+        }</td>
         <td class="num">${qte}</td>
         <td class="num">${formatMoney(prixU)}</td>
         <td class="num">${tva}%</td>
@@ -135,24 +104,21 @@ function lignesHtml(f: FactureVente): string {
     .join("");
 }
 
-export type PrintFactureOptions = {
-  /** true = image papier à en-tête telle quelle ; false = zones vides (papier déjà imprimé). */
+export type PrintDevisOptions = {
+  /** true = image papier à en-tête ; false = zones vides (papier déjà imprimé). */
   withLetterhead?: boolean;
 };
 
 /**
- * Impression facture client.
- * Conception en-tête / pied = image lettre-speedyprint.png (inchangée).
- * Seul le contenu facture est injecté dans la zone centrale.
+ * Impression devis client — même fond lettre-speedyprint.png que facture.
  */
-export function buildFactureVentePrintHtml(
-  f: FactureVente,
-  options: PrintFactureOptions = {}
+export function buildDevisPrintHtml(
+  d: Devis,
+  options: PrintDevisOptions = {}
 ): string {
   const withLetterhead = options.withLetterhead !== false;
-  const { ht, tva, ttc, tvaLabel } = calcMontants(f);
-  const client = clientInfo(f);
-  const pay = paymentInfo(f);
+  const { ht, tva, ttc, tvaLabel } = calcMontants(d);
+  const client = clientInfo(d);
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
   const letterUrl = `${origin}/lettre-speedyprint.png`;
@@ -165,7 +131,7 @@ export function buildFactureVentePrintHtml(
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>Facture ${escapeHtml(f.numeroFacture)}</title>
+<title>Devis ${escapeHtml(d.numeroDevis)}</title>
 <style>
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
@@ -186,7 +152,6 @@ export function buildFactureVentePrintHtml(
     overflow: hidden;
     ${pageBg}
   }
-  /* Zone centrale : sous l'en-tête, au-dessus du pied — conception intacte */
   .content {
     position: absolute;
     top: 55mm;
@@ -330,14 +295,15 @@ export function buildFactureVentePrintHtml(
         ${client.ice ? `<div class="line">ICE : <b>${escapeHtml(client.ice)}</b></div>` : ""}
       </div>
       <div class="box">
-        <h3>Facture</h3>
-        <div class="line">N° : <b>${escapeHtml(f.numeroFacture)}</b></div>
-        <div class="line">Date d'émission : <b>${formatDateFR(f.date)}</b></div>
-        <div class="line">Règlement : <b>${escapeHtml(f.typeReglement)}</b></div>
+        <h3>Devis</h3>
+        <div class="line">N° : <b>${escapeHtml(d.numeroDevis)}</b></div>
+        <div class="line">Date d'émission : <b>${formatDateFR(d.date)}</b></div>
+        <div class="line">Règlement : <b>${escapeHtml(d.typeReglement)}</b></div>
+        <div class="line">Échéance : <b>${formatDateFR(d.echeance)}</b></div>
       </div>
     </div>
 
-    <div class="doc-title">Détail Facture</div>
+    <div class="doc-title">Détail Devis</div>
 
     <table class="lines">
       <thead>
@@ -352,17 +318,15 @@ export function buildFactureVentePrintHtml(
         </tr>
       </thead>
       <tbody>
-        ${lignesHtml(f)}
+        ${lignesHtml(d)}
       </tbody>
     </table>
 
     <div class="bottom-grid">
       <div class="payment-note">
-        <strong>Informations de paiement</strong>
-        <div class="pay-line"><span class="pay-lab">Mode :</span> <b>${escapeHtml(pay.mode)}</b></div>
-        <div class="pay-line"><span class="pay-lab">N° :</span> <b>${escapeHtml(pay.numero)}</b></div>
-        <div class="pay-line"><span class="pay-lab">Nom Tiré :</span> <b>${escapeHtml(pay.nomTire)}</b></div>
-        <div class="pay-line"><span class="pay-lab">Date Encaiss :</span> <b>${escapeHtml(pay.dateEncaisse)}</b></div>
+        <strong>Conditions</strong>
+        <div class="pay-line"><span class="pay-lab">Mode :</span> <b>${escapeHtml(d.typeReglement || "—")}</b></div>
+        <div class="pay-line"><span class="pay-lab">Échéance :</span> <b>${formatDateFR(d.echeance)}</b></div>
       </div>
       <table class="totals">
         <tr><td>Total HT</td><td>${formatMoney(ht)}</td></tr>
@@ -376,18 +340,14 @@ export function buildFactureVentePrintHtml(
 </html>`;
 }
 
-/**
- * Ouvre l'aperçu / impression.
- * Important : ne pas utiliser noopener (sinon window.open renvoie null).
- */
-export function printFactureVente(
-  f: FactureVente,
-  options: PrintFactureOptions = {}
+export function printDevis(
+  d: Devis,
+  options: PrintDevisOptions = {}
 ): boolean {
   const win = window.open("", "_blank", "width=920,height=1100");
   if (!win) return false;
 
-  const html = buildFactureVentePrintHtml(f, options);
+  const html = buildDevisPrintHtml(d, options);
   win.document.open();
   win.document.write(html);
   win.document.close();

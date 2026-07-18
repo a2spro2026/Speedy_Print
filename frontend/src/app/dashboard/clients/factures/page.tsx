@@ -177,7 +177,7 @@ export default function FactureVentePage() {
       date: todayISO(),
       typeFacture: "TTC",
       base: "Vente",
-      numeroFacture: "FC-26/0001",
+      numeroFacture: "0001-Fact",
       id: "FV-0001",
       clientId: "",
       nomClient: "",
@@ -499,7 +499,7 @@ export default function FactureVentePage() {
               <Field label="N°" error={errors.numeroFacture?.message}>
                 <Input
                   {...register("numeroFacture")}
-                  placeholder="FC-26/0001"
+                  placeholder="0001-Fact"
                   readOnly
                   className={`${inputReadonly} font-semibold`}
                 />
