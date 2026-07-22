@@ -33,6 +33,7 @@ import {
   moisOptions,
   nextFactureVenteId,
   nextNumeroFacture,
+  normalizeNumeroFacture,
   saveFacturesVente,
   syncClientSoldeOnFactureCreate,
   syncClientSoldeOnFactureDelete,
@@ -177,7 +178,7 @@ export default function FactureVentePage() {
       date: todayISO(),
       typeFacture: "TTC",
       base: "Vente",
-      numeroFacture: "0001-Fact",
+      numeroFacture: "0380-Fact",
       id: "FV-0001",
       clientId: "",
       nomClient: "",
@@ -249,12 +250,13 @@ export default function FactureVentePage() {
 
   function openNouveau() {
     const d = todayISO();
+    const numero = nextNumeroFacture(list, d) || "0380-Fact";
     reset({
       mois: moisFromDate(d),
       date: d,
       typeFacture: "TTC",
       base: "Vente",
-      numeroFacture: nextNumeroFacture(list, d),
+      numeroFacture: numero,
       id: nextFactureVenteId(list),
       clientId: "",
       nomClient: "",
@@ -382,7 +384,9 @@ export default function FactureVentePage() {
       date: values.date,
       typeFacture: type,
       base: values.base,
-      numeroFacture: values.numeroFacture.trim(),
+      numeroFacture: normalizeNumeroFacture(
+        values.numeroFacture.trim() || nextNumeroFacture(list)
+      ),
       clientId: values.clientId,
       nomClient: values.nomClient.trim(),
       ice: (values.ice ?? "").trim(),
@@ -499,7 +503,7 @@ export default function FactureVentePage() {
               <Field label="N°" error={errors.numeroFacture?.message}>
                 <Input
                   {...register("numeroFacture")}
-                  placeholder="0001-Fact"
+                  placeholder="0380-Fact"
                   readOnly
                   className={`${inputReadonly} font-semibold`}
                 />

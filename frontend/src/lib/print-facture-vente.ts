@@ -1,6 +1,7 @@
 import { loadClients } from "@/lib/clients";
 import { formatDateFR, type FactureVente } from "@/lib/factures-vente";
 import { formatMoney } from "@/lib/money";
+import { montantEnLettres } from "@/lib/montant-en-lettres";
 import { loadReglementsClient } from "@/lib/reglements-client";
 
 /** Accent facture (totaux) — hors conception papier à en-tête. */
@@ -153,6 +154,7 @@ export function buildFactureVentePrintHtml(
   const { ht, tva, ttc, tvaLabel } = calcMontants(f);
   const client = clientInfo(f);
   const pay = paymentInfo(f);
+  const lettres = montantEnLettres(ttc);
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
   const letterUrl = `${origin}/lettre-speedyprint.png`;
@@ -312,6 +314,29 @@ export function buildFactureVentePrintHtml(
     padding: 8px;
   }
 
+  .montant-lettres {
+    margin-top: 14px;
+    padding: 8px 10px;
+    border: 1px solid #e5e5e5;
+    background: rgba(255,255,255,0.92);
+    font-size: 11px;
+    line-height: 1.45;
+    color: #222;
+  }
+  .montant-lettres .lab {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: ${ACCENT};
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .montant-lettres .val {
+    font-weight: 600;
+    font-style: italic;
+  }
+
   @media print {
     .page { width: 210mm; height: 297mm; }
   }
@@ -369,6 +394,11 @@ export function buildFactureVentePrintHtml(
         <tr><td>${escapeHtml(tvaLabel)}</td><td>${formatMoney(tva)}</td></tr>
         <tr class="ttc"><td>Total TTC</td><td>${formatMoney(ttc)}</td></tr>
       </table>
+    </div>
+
+    <div class="montant-lettres">
+      <span class="lab">Arrêté la présente facture à la somme de</span>
+      <span class="val">${escapeHtml(lettres)}</span>
     </div>
   </div>
 </div>

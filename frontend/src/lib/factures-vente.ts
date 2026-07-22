@@ -111,17 +111,27 @@ export function nextFactureVenteId(existing: FactureVente[]): string {
   return padId(max + 1);
 }
 
-/** N° facture affiché : 0001-Fact, 0002-Fact… */
+/** N° facture affiché : 0380-Fact, 0381-Fact… */
+const NUMERO_FACTURE_START = 380;
+
+/** Normalise un n° facture vers le format 0380-Fact. */
+export function normalizeNumeroFacture(raw: string): string {
+  const s = (raw || "").trim();
+  const m =
+    /^(\d+)-Fact$/i.exec(s) ||
+    /^FC-\d{2}\/(\d+)$/i.exec(s);
+  if (m) return `${String(Number(m[1])).padStart(4, "0")}-Fact`;
+  return s;
+}
+
 export function nextNumeroFacture(
   existing: FactureVente[],
   _dateISO?: string
 ): string {
-  let max = 0;
+  let max = NUMERO_FACTURE_START - 1;
   for (const f of existing) {
-    const raw = (f.numeroFacture || "").trim();
-    const m =
-      /^(\d+)-Fact$/i.exec(raw) ||
-      /^FC-\d{2}\/(\d+)$/i.exec(raw);
+    const raw = normalizeNumeroFacture(f.numeroFacture || "");
+    const m = /^(\d+)-Fact$/i.exec(raw);
     if (m) max = Math.max(max, Number(m[1]));
   }
   return `${String(max + 1).padStart(4, "0")}-Fact`;
@@ -218,6 +228,7 @@ export function loadFacturesVente(): FactureVente[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.map((f) => ({
       ...f,
+      numeroFacture: normalizeNumeroFacture(f.numeroFacture || ""),
       typeReglement: normalizeTypeReglement(f.typeReglement),
       lignes:
         Array.isArray(f.lignes) && f.lignes.length > 0 ? f.lignes : [emptyLigne()],
