@@ -199,7 +199,9 @@ export default function FactureVentePage() {
   }, [watchLignes]);
 
   useEffect(() => {
-    setList(loadFacturesVente());
+    const loaded = loadFacturesVente();
+    setList(loaded);
+    saveFacturesVente(loaded);
     setClients(loadClients());
     const cat = refreshCatalog();
     setProduits(cat.produits);

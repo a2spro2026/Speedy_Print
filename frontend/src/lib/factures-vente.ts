@@ -112,7 +112,7 @@ export function nextFactureVenteId(existing: FactureVente[]): string {
 }
 
 /** N° facture affiché : 0380-Fact, 0381-Fact… */
-const NUMERO_FACTURE_START = 380;
+export const NUMERO_FACTURE_START = 380;
 
 /** Normalise un n° facture vers le format 0380-Fact. */
 export function normalizeNumeroFacture(raw: string): string {
@@ -124,17 +124,62 @@ export function normalizeNumeroFacture(raw: string): string {
   return s;
 }
 
+function parseFactureNumero(raw: string): number | null {
+  const m = /^(\d+)-Fact$/i.exec(normalizeNumeroFacture(raw));
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Si toutes les factures ont un n° < 0380 (anciennes données de test),
+ * les renumérote à partir de 0380-Fact. Sinon, normalise seulement.
+ */
+export function migrateFactureNumeros(list: FactureVente[]): FactureVente[] {
+  if (list.length === 0) return list;
+
+  const parsed = list.map((f) => ({
+    f,
+    n: parseFactureNumero(f.numeroFacture || ""),
+  }));
+  const hasFromStart = parsed.some(
+    (x) => x.n != null && x.n >= NUMERO_FACTURE_START
+  );
+
+  if (hasFromStart) {
+    return list.map((f) => ({
+      ...f,
+      numeroFacture: normalizeNumeroFacture(f.numeroFacture || ""),
+    }));
+  }
+
+  const ordered = [...parsed].sort((a, b) => {
+    const da = a.f.date.localeCompare(b.f.date);
+    if (da !== 0) return da;
+    return a.f.id.localeCompare(b.f.id);
+  });
+  const byId = new Map<string, string>();
+  ordered.forEach((x, i) => {
+    byId.set(
+      x.f.id,
+      `${String(NUMERO_FACTURE_START + i).padStart(4, "0")}-Fact`
+    );
+  });
+
+  return list.map((f) => ({
+    ...f,
+    numeroFacture: byId.get(f.id) || normalizeNumeroFacture(f.numeroFacture || ""),
+  }));
+}
+
 export function nextNumeroFacture(
   existing: FactureVente[],
   _dateISO?: string
 ): string {
   let max = NUMERO_FACTURE_START - 1;
   for (const f of existing) {
-    const raw = normalizeNumeroFacture(f.numeroFacture || "");
-    const m = /^(\d+)-Fact$/i.exec(raw);
-    if (m) max = Math.max(max, Number(m[1]));
+    const n = parseFactureNumero(f.numeroFacture || "");
+    if (n != null) max = Math.max(max, n);
   }
-  return `${String(max + 1).padStart(4, "0")}-Fact`;
+  return `${String(Math.max(max + 1, NUMERO_FACTURE_START)).padStart(4, "0")}-Fact`;
 }
 
 export function isDevisConverted(
@@ -226,14 +271,17 @@ export function loadFacturesVente(): FactureVente[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as FactureVente[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((f) => ({
-      ...f,
-      numeroFacture: normalizeNumeroFacture(f.numeroFacture || ""),
-      typeReglement: normalizeTypeReglement(f.typeReglement),
-      lignes:
-        Array.isArray(f.lignes) && f.lignes.length > 0 ? f.lignes : [emptyLigne()],
-      montantFacture: Number(f.montantFacture) || 0,
-    }));
+    return migrateFactureNumeros(
+      parsed.map((f) => ({
+        ...f,
+        typeReglement: normalizeTypeReglement(f.typeReglement),
+        lignes:
+          Array.isArray(f.lignes) && f.lignes.length > 0
+            ? f.lignes
+            : [emptyLigne()],
+        montantFacture: Number(f.montantFacture) || 0,
+      }))
+    );
   } catch {
     return [];
   }
