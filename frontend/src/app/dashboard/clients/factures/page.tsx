@@ -147,9 +147,7 @@ function toFormValues(f: FactureVente): FormValues {
 function onPrintFacture(f: FactureVente, withLetterhead: boolean) {
   const ok = printFactureVente(f, { withLetterhead });
   if (!ok) {
-    toast.error(
-      "Impossible d'ouvrir la fenêtre d'impression. Autorisez les pop-ups pour ce site."
-    );
+    toast.error("Impossible de lancer l'impression. Réessayez.");
   }
 }
 
@@ -927,8 +925,8 @@ export default function FactureVentePage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const f = printTarget;
-                  setPrintTarget(null);
                   onPrintFacture(f, true);
+                  setPrintTarget(null);
                 }}
               >
                 <FileText className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
@@ -946,8 +944,8 @@ export default function FactureVentePage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const f = printTarget;
-                  setPrintTarget(null);
                   onPrintFacture(f, false);
+                  setPrintTarget(null);
                 }}
               >
                 <FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />

@@ -1,6 +1,7 @@
 import { loadClients } from "@/lib/clients";
 import { formatDateFR, type Devis } from "@/lib/devis";
 import { formatMoney } from "@/lib/money";
+import { printHtmlDocument } from "@/lib/print-html";
 
 /** Accent devis (totaux) — même famille que facture client. */
 const ACCENT = "#64748B";
@@ -344,28 +345,5 @@ export function printDevis(
   d: Devis,
   options: PrintDevisOptions = {}
 ): boolean {
-  const win = window.open("", "_blank", "width=920,height=1100");
-  if (!win) return false;
-
-  const html = buildDevisPrintHtml(d, options);
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-
-  const trigger = () => {
-    try {
-      win.print();
-    } catch {
-      /* ignore */
-    }
-  };
-
-  if (win.document.readyState === "complete") {
-    setTimeout(trigger, 350);
-  } else {
-    win.addEventListener("load", () => setTimeout(trigger, 250));
-    setTimeout(trigger, 900);
-  }
-  return true;
+  return printHtmlDocument(buildDevisPrintHtml(d, options));
 }

@@ -2,6 +2,7 @@ import { loadClients } from "@/lib/clients";
 import { formatDateFR, type FactureVente } from "@/lib/factures-vente";
 import { formatMoney } from "@/lib/money";
 import { montantEnLettres } from "@/lib/montant-en-lettres";
+import { printHtmlDocument } from "@/lib/print-html";
 import { loadReglementsClient } from "@/lib/reglements-client";
 
 /** Accent facture (totaux) — hors conception papier à en-tête. */
@@ -407,35 +408,11 @@ export function buildFactureVentePrintHtml(
 }
 
 /**
- * Ouvre l'aperçu / impression.
- * Important : ne pas utiliser noopener (sinon window.open renvoie null).
+ * Impression facture client (iframe, sans popup bloquée).
  */
 export function printFactureVente(
   f: FactureVente,
   options: PrintFactureOptions = {}
 ): boolean {
-  const win = window.open("", "_blank", "width=920,height=1100");
-  if (!win) return false;
-
-  const html = buildFactureVentePrintHtml(f, options);
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-
-  const trigger = () => {
-    try {
-      win.print();
-    } catch {
-      /* ignore */
-    }
-  };
-
-  if (win.document.readyState === "complete") {
-    setTimeout(trigger, 350);
-  } else {
-    win.addEventListener("load", () => setTimeout(trigger, 250));
-    setTimeout(trigger, 900);
-  }
-  return true;
+  return printHtmlDocument(buildFactureVentePrintHtml(f, options));
 }

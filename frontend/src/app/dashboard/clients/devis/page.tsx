@@ -150,9 +150,7 @@ function toFormValues(f: Devis): FormValues {
 function onPrintDevis(d: Devis, withLetterhead: boolean) {
   const ok = printDevis(d, { withLetterhead });
   if (!ok) {
-    toast.error(
-      "Impossible d'ouvrir la fenêtre d'impression. Autorisez les pop-ups pour ce site."
-    );
+    toast.error("Impossible de lancer l'impression. Réessayez.");
   }
 }
 
@@ -906,8 +904,8 @@ export default function DevisPage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const d = printTarget;
-                  setPrintTarget(null);
                   onPrintDevis(d, true);
+                  setPrintTarget(null);
                 }}
               >
                 <FileText className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
@@ -925,8 +923,8 @@ export default function DevisPage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const d = printTarget;
-                  setPrintTarget(null);
                   onPrintDevis(d, false);
+                  setPrintTarget(null);
                 }}
               >
                 <FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
