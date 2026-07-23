@@ -176,7 +176,7 @@ export default function FactureVentePage() {
       date: todayISO(),
       typeFacture: "TTC",
       base: "Vente",
-      numeroFacture: "0380-Fact",
+      numeroFacture: "0380/2026-Fact",
       id: "FV-0001",
       clientId: "",
       nomClient: "",
@@ -250,7 +250,7 @@ export default function FactureVentePage() {
 
   function openNouveau() {
     const d = todayISO();
-    const numero = nextNumeroFacture(list, d) || "0380-Fact";
+    const numero = nextNumeroFacture(list, d) || "0380/2026-Fact";
     reset({
       mois: moisFromDate(d),
       date: d,
@@ -385,7 +385,8 @@ export default function FactureVentePage() {
       typeFacture: type,
       base: values.base,
       numeroFacture: normalizeNumeroFacture(
-        values.numeroFacture.trim() || nextNumeroFacture(list)
+        values.numeroFacture.trim() || nextNumeroFacture(list, values.date),
+        values.date
       ),
       clientId: values.clientId,
       nomClient: values.nomClient.trim(),
@@ -503,7 +504,7 @@ export default function FactureVentePage() {
               <Field label="N°" error={errors.numeroFacture?.message}>
                 <Input
                   {...register("numeroFacture")}
-                  placeholder="0380-Fact"
+                  placeholder="0380/2026-Fact"
                   readOnly
                   className={`${inputReadonly} font-semibold`}
                 />

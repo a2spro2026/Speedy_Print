@@ -121,8 +121,6 @@ function lignesHtml(f: FactureVente): string {
         brut * (1 - Math.min(Math.max(remise, 0), 100) / 100)
       );
       return `<tr class="${i % 2 ? "alt" : ""}">
-        <td class="c">${i + 1}</td>
-        <td class="ref">${escapeHtml(l.ref || "—")}</td>
         <td class="desig">
           ${escapeHtml(l.designation || "—")}
           ${l.unite ? `<div class="sub">Unité : ${escapeHtml(l.unite)}</div>` : ""}
@@ -213,7 +211,8 @@ export function buildFactureVentePrintHtml(
   }
   .box h3 {
     margin: 0 0 8px;
-    font-size: 11px;
+    font-size: 13px;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: ${ACCENT};
@@ -307,7 +306,7 @@ export function buildFactureVentePrintHtml(
     white-space: nowrap;
   }
   .totals tr.ttc td {
-    background: ${ACCENT};
+    background: #111;
     color: #fff;
     font-size: 13px;
     font-weight: 800;
@@ -350,7 +349,6 @@ export function buildFactureVentePrintHtml(
       <div class="box">
         <h3>Client</h3>
         <div class="name">${escapeHtml(client.nom)}</div>
-        ${client.id ? `<div class="line">ID : <b>${escapeHtml(client.id)}</b></div>` : ""}
         ${client.contact ? `<div class="line">${escapeHtml(client.contact)}</div>` : ""}
         ${client.ville ? `<div class="line">${escapeHtml(client.ville)}</div>` : ""}
         ${client.ice ? `<div class="line">ICE : <b>${escapeHtml(client.ice)}</b></div>` : ""}
@@ -368,8 +366,6 @@ export function buildFactureVentePrintHtml(
     <table class="lines">
       <thead>
         <tr>
-          <th class="c">N°</th>
-          <th>Réf</th>
           <th>Désignation</th>
           <th class="num">Qté</th>
           <th class="num">Prix/U</th>

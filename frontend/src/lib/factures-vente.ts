@@ -111,27 +111,49 @@ export function nextFactureVenteId(existing: FactureVente[]): string {
   return padId(max + 1);
 }
 
-/** N° facture affiché : 0380-Fact, 0381-Fact… */
+/** N° facture affiché : 0380/2026-Fact, 0381/2026-Fact… */
 export const NUMERO_FACTURE_START = 380;
 
-/** Normalise un n° facture vers le format 0380-Fact. */
-export function normalizeNumeroFacture(raw: string): string {
+function yearFromDate(dateISO?: string): string {
+  const y = (dateISO || "").slice(0, 4);
+  if (/^\d{4}$/.test(y)) return y;
+  return String(new Date().getFullYear());
+}
+
+function formatNumeroFacture(n: number, dateISO?: string): string {
+  return `${String(n).padStart(4, "0")}/${yearFromDate(dateISO)}-Fact`;
+}
+
+/** Normalise un n° facture vers le format 0380/2026-Fact. */
+export function normalizeNumeroFacture(
+  raw: string,
+  dateISO?: string
+): string {
   const s = (raw || "").trim();
   const m =
+    /^(\d+)\/(\d{4})-Fact$/i.exec(s) ||
     /^(\d+)-Fact$/i.exec(s) ||
     /^FC-\d{2}\/(\d+)$/i.exec(s);
-  if (m) return `${String(Number(m[1])).padStart(4, "0")}-Fact`;
+  if (m) {
+    const n = Number(m[1]);
+    const year = m[2] && /^\d{4}$/.test(m[2]) ? m[2] : yearFromDate(dateISO);
+    return `${String(n).padStart(4, "0")}/${year}-Fact`;
+  }
   return s;
 }
 
 function parseFactureNumero(raw: string): number | null {
-  const m = /^(\d+)-Fact$/i.exec(normalizeNumeroFacture(raw));
+  const s = (raw || "").trim();
+  const m =
+    /^(\d+)\/\d{4}-Fact$/i.exec(s) ||
+    /^(\d+)-Fact$/i.exec(s) ||
+    /^FC-\d{2}\/(\d+)$/i.exec(s);
   return m ? Number(m[1]) : null;
 }
 
 /**
  * Si toutes les factures ont un n° < 0380 (anciennes données de test),
- * les renumérote à partir de 0380-Fact. Sinon, normalise seulement.
+ * les renumérote à partir de 0380/AAAA-Fact. Sinon, normalise seulement.
  */
 export function migrateFactureNumeros(list: FactureVente[]): FactureVente[] {
   if (list.length === 0) return list;
@@ -147,7 +169,7 @@ export function migrateFactureNumeros(list: FactureVente[]): FactureVente[] {
   if (hasFromStart) {
     return list.map((f) => ({
       ...f,
-      numeroFacture: normalizeNumeroFacture(f.numeroFacture || ""),
+      numeroFacture: normalizeNumeroFacture(f.numeroFacture || "", f.date),
     }));
   }
 
@@ -160,26 +182,30 @@ export function migrateFactureNumeros(list: FactureVente[]): FactureVente[] {
   ordered.forEach((x, i) => {
     byId.set(
       x.f.id,
-      `${String(NUMERO_FACTURE_START + i).padStart(4, "0")}-Fact`
+      formatNumeroFacture(NUMERO_FACTURE_START + i, x.f.date)
     );
   });
 
   return list.map((f) => ({
     ...f,
-    numeroFacture: byId.get(f.id) || normalizeNumeroFacture(f.numeroFacture || ""),
+    numeroFacture:
+      byId.get(f.id) || normalizeNumeroFacture(f.numeroFacture || "", f.date),
   }));
 }
 
 export function nextNumeroFacture(
   existing: FactureVente[],
-  _dateISO?: string
+  dateISO?: string
 ): string {
   let max = NUMERO_FACTURE_START - 1;
   for (const f of existing) {
     const n = parseFactureNumero(f.numeroFacture || "");
     if (n != null) max = Math.max(max, n);
   }
-  return `${String(Math.max(max + 1, NUMERO_FACTURE_START)).padStart(4, "0")}-Fact`;
+  return formatNumeroFacture(
+    Math.max(max + 1, NUMERO_FACTURE_START),
+    dateISO
+  );
 }
 
 export function isDevisConverted(
