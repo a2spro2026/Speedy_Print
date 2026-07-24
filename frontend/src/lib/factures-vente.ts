@@ -27,6 +27,7 @@ export type FactureVente = {
   typeFacture: TypeFacture;
   base: BaseFacture;
   numeroFacture: string;
+  bonCmdNumero: string; // Bon Cmd N° (saisie manuelle, ex. BC-…)
   clientId: string;
   nomClient: string;
   ice: string;
@@ -239,6 +240,7 @@ export function factureFromDevis(
     typeFacture: devis.typeFacture,
     base: "Vente",
     numeroFacture,
+    bonCmdNumero: "BC-",
     clientId: devis.clientId,
     nomClient: devis.nomClient,
     ice: devis.ice ?? "",
@@ -300,6 +302,7 @@ export function loadFacturesVente(): FactureVente[] {
     return migrateFactureNumeros(
       parsed.map((f) => ({
         ...f,
+        bonCmdNumero: normalizeBonCmdNumero(f.bonCmdNumero ?? ""),
         typeReglement: normalizeTypeReglement(f.typeReglement),
         lignes:
           Array.isArray(f.lignes) && f.lignes.length > 0
@@ -315,6 +318,14 @@ export function loadFacturesVente(): FactureVente[] {
 
 export function saveFacturesVente(list: FactureVente[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+/** Force le préfixe BC- sur le n° de bon de commande. */
+export function normalizeBonCmdNumero(raw: string): string {
+  let s = (raw || "").trim();
+  if (!s) return "";
+  s = s.replace(/^BC-?/i, "").trim();
+  return s ? `BC-${s}` : "BC-";
 }
 
 /** Qté vendue d'un produit (réf) depuis les factures de vente. Avoir = négatif. */

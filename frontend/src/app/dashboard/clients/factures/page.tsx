@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, FileText, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Eye, FileDown, FileText, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,10 @@ import {
 } from "@/lib/ensure-catalog-item";
 import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
-import { printFactureVente } from "@/lib/print-facture-vente";
+import {
+  downloadFactureVente,
+  printFactureVente,
+} from "@/lib/print-facture-vente";
 import {
   BASES_FACTURE,
   TYPES_FACTURE,
@@ -33,6 +36,7 @@ import {
   moisOptions,
   nextFactureVenteId,
   nextNumeroFacture,
+  normalizeBonCmdNumero,
   normalizeNumeroFacture,
   saveFacturesVente,
   syncClientSoldeOnFactureCreate,
@@ -63,6 +67,7 @@ const schema = z.object({
   typeFacture: z.enum(["Exonéré", "HT", "TTC"]),
   base: z.enum(["Vente", "Avoir"]),
   numeroFacture: z.string().min(1, "N° facture obligatoire"),
+  bonCmdNumero: z.string().optional(),
   id: z.string(), // interne FV-
   clientId: z.string().min(1, "Client obligatoire"),
   nomClient: z.string().min(1),
@@ -134,6 +139,7 @@ function toFormValues(f: FactureVente): FormValues {
     typeFacture: f.typeFacture,
     base: f.base,
     numeroFacture: f.numeroFacture,
+    bonCmdNumero: normalizeBonCmdNumero(f.bonCmdNumero ?? "") || "BC-",
     id: f.id,
     clientId: f.clientId,
     nomClient: f.nomClient,
@@ -149,6 +155,16 @@ function onPrintFacture(f: FactureVente, withLetterhead: boolean) {
   if (!ok) {
     toast.error("Impossible de lancer l'impression. Réessayez.");
   }
+}
+
+async function onDownloadFacture(f: FactureVente) {
+  toast.message("Préparation du PDF…");
+  const ok = await downloadFactureVente(f, { withLetterhead: true });
+  if (!ok) {
+    toast.error("Impossible de télécharger le PDF. Réessayez.");
+    return;
+  }
+  toast.success("PDF téléchargé.");
 }
 
 export default function FactureVentePage() {
@@ -177,6 +193,7 @@ export default function FactureVentePage() {
       typeFacture: "TTC",
       base: "Vente",
       numeroFacture: "0380/2026-Fact",
+      bonCmdNumero: "BC-",
       id: "FV-0001",
       clientId: "",
       nomClient: "",
@@ -257,6 +274,7 @@ export default function FactureVentePage() {
       typeFacture: "TTC",
       base: "Vente",
       numeroFacture: numero,
+      bonCmdNumero: "BC-",
       id: nextFactureVenteId(list),
       clientId: "",
       nomClient: "",
@@ -388,6 +406,7 @@ export default function FactureVentePage() {
         values.numeroFacture.trim() || nextNumeroFacture(list, values.date),
         values.date
       ),
+      bonCmdNumero: normalizeBonCmdNumero(values.bonCmdNumero ?? ""),
       clientId: values.clientId,
       nomClient: values.nomClient.trim(),
       ice: (values.ice ?? "").trim(),
@@ -507,6 +526,16 @@ export default function FactureVentePage() {
                   placeholder="0380/2026-Fact"
                   readOnly
                   className={`${inputReadonly} font-semibold`}
+                />
+              </Field>
+            </div>
+            <div className="min-w-[130px] flex-1">
+              <Field label="Bon Cmd N°" error={errors.bonCmdNumero?.message}>
+                <Input
+                  {...register("bonCmdNumero")}
+                  placeholder="BC-"
+                  readOnly={readOnly}
+                  className={readOnly ? inputReadonly : inputShell}
                 />
               </Field>
             </div>
@@ -869,6 +898,13 @@ export default function FactureVentePage() {
                           className="text-slate-700 hover:bg-white"
                         >
                           <Printer className="h-4 w-4" />
+                        </ActionBtn>
+                        <ActionBtn
+                          label="Télécharger PDF"
+                          onClick={() => void onDownloadFacture(f)}
+                          className="text-emerald-700 hover:bg-white"
+                        >
+                          <FileDown className="h-4 w-4" />
                         </ActionBtn>
                         <ActionBtn
                           label="Supprimer"

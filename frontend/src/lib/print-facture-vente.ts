@@ -1,5 +1,9 @@
 import { loadClients } from "@/lib/clients";
-import { formatDateFR, type FactureVente } from "@/lib/factures-vente";
+import {
+  formatDateFR,
+  normalizeBonCmdNumero,
+  type FactureVente,
+} from "@/lib/factures-vente";
 import { formatMoney } from "@/lib/money";
 import { montantEnLettres } from "@/lib/montant-en-lettres";
 import { printHtmlDocument } from "@/lib/print-html";
@@ -267,7 +271,7 @@ export function buildFactureVentePrintHtml(
     display: grid;
     grid-template-columns: 1fr 240px;
     gap: 16px;
-    margin-top: 12px;
+    margin-top: 28px;
     align-items: start;
   }
   .payment-note {
@@ -290,6 +294,9 @@ export function buildFactureVentePrintHtml(
     color: #555;
   }
 
+  .totals-wrap {
+    margin-top: 18px;
+  }
   .totals {
     width: 100%;
     border-collapse: collapse;
@@ -305,13 +312,19 @@ export function buildFactureVentePrintHtml(
     font-weight: 700;
     white-space: nowrap;
   }
+  .totals tr.spacer td {
+    border: none;
+    padding: 10px 0 0;
+    height: 12px;
+    background: transparent;
+  }
   .totals tr.ttc td {
     background: #111;
     color: #fff;
     font-size: 13px;
     font-weight: 800;
     border: none;
-    padding: 8px;
+    padding: 10px 8px;
   }
 
   .montant-lettres {
@@ -356,6 +369,12 @@ export function buildFactureVentePrintHtml(
       <div class="box">
         <h3>Facture</h3>
         <div class="line">N° : <b>${escapeHtml(f.numeroFacture)}</b></div>
+        ${(() => {
+          const bc = normalizeBonCmdNumero(f.bonCmdNumero || "");
+          return bc
+            ? `<div class="line">Bon de commande N° : <b>${escapeHtml(bc)}</b></div>`
+            : "";
+        })()}
         <div class="line">Date d'émission : <b>${formatDateFR(f.date)}</b></div>
         <div class="line">Règlement : <b>${escapeHtml(f.typeReglement)}</b></div>
       </div>
@@ -386,11 +405,14 @@ export function buildFactureVentePrintHtml(
         <div class="pay-line"><span class="pay-lab">Nom Tiré :</span> <b>${escapeHtml(pay.nomTire)}</b></div>
         <div class="pay-line"><span class="pay-lab">Date Encaiss :</span> <b>${escapeHtml(pay.dateEncaisse)}</b></div>
       </div>
-      <table class="totals">
-        <tr><td>Total HT</td><td>${formatMoney(ht)}</td></tr>
-        <tr><td>${escapeHtml(tvaLabel)}</td><td>${formatMoney(tva)}</td></tr>
-        <tr class="ttc"><td>Total TTC</td><td>${formatMoney(ttc)}</td></tr>
-      </table>
+      <div class="totals-wrap">
+        <table class="totals">
+          <tr><td>Total HT</td><td>${formatMoney(ht)}</td></tr>
+          <tr><td>${escapeHtml(tvaLabel)}</td><td>${formatMoney(tva)}</td></tr>
+          <tr class="spacer"><td colspan="2"></td></tr>
+          <tr class="ttc"><td>Total TTC</td><td>${formatMoney(ttc)}</td></tr>
+        </table>
+      </div>
     </div>
 
     <div class="montant-lettres">
@@ -411,4 +433,93 @@ export function printFactureVente(
   options: PrintFactureOptions = {}
 ): boolean {
   return printHtmlDocument(buildFactureVentePrintHtml(f, options));
+}
+
+function safeFactureFileName(f: FactureVente): string {
+  return (f.numeroFacture || f.id || "facture")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "_");
+}
+
+/** Télécharge la facture en PDF (A4, avec en-tête si demandé). */
+export async function downloadFactureVente(
+  f: FactureVente,
+  options: PrintFactureOptions = {}
+): Promise<boolean> {
+  if (typeof document === "undefined") return false;
+
+  const html = buildFactureVentePrintHtml(f, options);
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:210mm;height:297mm;overflow:hidden;pointer-events:none;opacity:0;";
+  document.body.appendChild(host);
+
+  try {
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "width:210mm;height:297mm;border:0;";
+    host.appendChild(iframe);
+
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) return false;
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    await new Promise<void>((resolve) => {
+      const done = () => resolve();
+      if (doc.readyState === "complete") done();
+      else win.addEventListener("load", done, { once: true });
+      setTimeout(done, 800);
+    });
+
+    const images = Array.from(doc.images || []);
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete) resolve();
+            else {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }
+          })
+      )
+    );
+    // Laisse le rendu CSS / fond se stabiliser
+    await new Promise((r) => setTimeout(r, 200));
+
+    const page = doc.querySelector(".page") as HTMLElement | null;
+    if (!page) return false;
+
+    const html2canvas = (await import("html2canvas")).default;
+    const { jsPDF } = await import("jspdf");
+
+    const canvas = await html2canvas(page, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      windowWidth: page.scrollWidth,
+      windowHeight: page.scrollHeight,
+    });
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
+    pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+    pdf.save(`${safeFactureFileName(f)}.pdf`);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    host.remove();
+  }
 }
