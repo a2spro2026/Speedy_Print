@@ -221,6 +221,9 @@ export function buildFactureVentePrintHtml(
     letter-spacing: 0.06em;
     color: ${ACCENT};
   }
+  .box h3.facture-title {
+    font-size: 18px;
+  }
   .box .name {
     font-size: 13px;
     font-weight: 800;
@@ -228,6 +231,15 @@ export function buildFactureVentePrintHtml(
   }
   .box .line { margin: 2px 0; color: #333; }
   .box .line b { color: #111; }
+  .box .line.num-facture {
+    margin-top: 4px;
+    font-size: 15px;
+  }
+  .box .line.num-facture b {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
 
   .doc-title {
     text-align: left;
@@ -367,8 +379,8 @@ export function buildFactureVentePrintHtml(
         ${client.ice ? `<div class="line">ICE : <b>${escapeHtml(client.ice)}</b></div>` : ""}
       </div>
       <div class="box">
-        <h3>Facture</h3>
-        <div class="line">N° : <b>${escapeHtml(f.numeroFacture)}</b></div>
+        <h3 class="facture-title">Facture</h3>
+        <div class="line num-facture">N° : <b>${escapeHtml(f.numeroFacture)}</b></div>
         ${(() => {
           const bc = normalizeBonCmdNumero(f.bonCmdNumero || "");
           return bc

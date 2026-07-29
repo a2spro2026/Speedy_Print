@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, FileDown, FileText, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import {
+  Eye,
+  FileDown,
+  FileText,
+  Pencil,
+  Plus,
+  Printer,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,6 +178,7 @@ async function onDownloadFacture(f: FactureVente) {
 }
 
 export default function FactureVentePage() {
+  const router = useRouter();
   const [list, setList] = useState<FactureVente[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [produits, setProduits] = useState<Produit[]>([]);
@@ -192,7 +203,7 @@ export default function FactureVentePage() {
       date: todayISO(),
       typeFacture: "TTC",
       base: "Vente",
-      numeroFacture: "0380/2026-Fact",
+      numeroFacture: "380/2026-FAC",
       bonCmdNumero: "BC-",
       id: "FV-0001",
       clientId: "",
@@ -267,7 +278,7 @@ export default function FactureVentePage() {
 
   function openNouveau() {
     const d = todayISO();
-    const numero = nextNumeroFacture(list, d) || "0380/2026-Fact";
+    const numero = nextNumeroFacture(list, d) || "380/2026-FAC";
     reset({
       mois: moisFromDate(d),
       date: d,
@@ -355,6 +366,19 @@ export default function FactureVentePage() {
     saveFacturesVente(next);
     if (mode && getValues("id") === f.id) setMode(null);
     toast.success("Facture supprimée.");
+  }
+
+  function goPayer(factureId: string) {
+    const exists = list.some((f) => f.id === factureId);
+    if (!exists) {
+      toast.message("Validez d'abord la facture", {
+        description: "Enregistrez la facture avant de saisir le règlement.",
+      });
+      return;
+    }
+    router.push(
+      `/dashboard/clients/reglements?factureId=${encodeURIComponent(factureId)}`
+    );
   }
 
   function onSubmit(values: FormValues) {
@@ -523,7 +547,7 @@ export default function FactureVentePage() {
               <Field label="N°" error={errors.numeroFacture?.message}>
                 <Input
                   {...register("numeroFacture")}
-                  placeholder="0380/2026-Fact"
+                  placeholder="380/2026-FAC"
                   readOnly
                   className={`${inputReadonly} font-semibold`}
                 />
@@ -792,11 +816,29 @@ export default function FactureVentePage() {
 
           <div className="mt-4 flex justify-end gap-2 border-t border-slate-100/80 pt-3">
             {mode === "view" ? (
-              <Button type="button" variant="outline" onClick={closeForm}>
-                Fermer
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => goPayer(getValues("id"))}
+                >
+                  <Wallet className="h-4 w-4" />
+                  Payer
+                </Button>
+                <Button type="button" variant="outline" onClick={closeForm}>
+                  Fermer
+                </Button>
+              </>
             ) : (
               <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => goPayer(getValues("id"))}
+                >
+                  <Wallet className="h-4 w-4" />
+                  Payer
+                </Button>
                 <Button type="button" variant="outline" onClick={closeForm}>
                   Annuler
                 </Button>
@@ -891,6 +933,13 @@ export default function FactureVentePage() {
                           className="text-amber-700 hover:bg-white"
                         >
                           <Pencil className="h-4 w-4" />
+                        </ActionBtn>
+                        <ActionBtn
+                          label="Payer"
+                          onClick={() => goPayer(f.id)}
+                          className="text-violet-700 hover:bg-white"
+                        >
+                          <Wallet className="h-4 w-4" />
                         </ActionBtn>
                         <ActionBtn
                           label="Imprimer"

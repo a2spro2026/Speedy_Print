@@ -112,7 +112,7 @@ export function nextFactureVenteId(existing: FactureVente[]): string {
   return padId(max + 1);
 }
 
-/** N° facture affiché : 0380/2026-Fact, 0381/2026-Fact… */
+/** N° facture affiché : 380/2026-FAC, 381/2026-FAC… */
 export const NUMERO_FACTURE_START = 380;
 
 function yearFromDate(dateISO?: string): string {
@@ -122,23 +122,25 @@ function yearFromDate(dateISO?: string): string {
 }
 
 function formatNumeroFacture(n: number, dateISO?: string): string {
-  return `${String(n).padStart(4, "0")}/${yearFromDate(dateISO)}-Fact`;
+  return `${n}/${yearFromDate(dateISO)}-FAC`;
 }
 
-/** Normalise un n° facture vers le format 0380/2026-Fact. */
+/** Normalise un n° facture vers le format 380/2026-FAC. */
 export function normalizeNumeroFacture(
   raw: string,
   dateISO?: string
 ): string {
   const s = (raw || "").trim();
   const m =
+    /^(\d+)\/(\d{4})-FAC(?:TURE)?$/i.exec(s) ||
     /^(\d+)\/(\d{4})-Fact$/i.exec(s) ||
+    /^(\d+)-FAC(?:TURE)?$/i.exec(s) ||
     /^(\d+)-Fact$/i.exec(s) ||
     /^FC-\d{2}\/(\d+)$/i.exec(s);
   if (m) {
     const n = Number(m[1]);
     const year = m[2] && /^\d{4}$/.test(m[2]) ? m[2] : yearFromDate(dateISO);
-    return `${String(n).padStart(4, "0")}/${year}-Fact`;
+    return `${n}/${year}-FAC`;
   }
   return s;
 }
@@ -146,15 +148,17 @@ export function normalizeNumeroFacture(
 function parseFactureNumero(raw: string): number | null {
   const s = (raw || "").trim();
   const m =
+    /^(\d+)\/\d{4}-FAC(?:TURE)?$/i.exec(s) ||
     /^(\d+)\/\d{4}-Fact$/i.exec(s) ||
+    /^(\d+)-FAC(?:TURE)?$/i.exec(s) ||
     /^(\d+)-Fact$/i.exec(s) ||
     /^FC-\d{2}\/(\d+)$/i.exec(s);
   return m ? Number(m[1]) : null;
 }
 
 /**
- * Si toutes les factures ont un n° < 0380 (anciennes données de test),
- * les renumérote à partir de 0380/AAAA-Fact. Sinon, normalise seulement.
+ * Si toutes les factures ont un n° < 380 (anciennes données de test),
+ * les renumérote à partir de 380/AAAA-FAC. Sinon, normalise seulement.
  */
 export function migrateFactureNumeros(list: FactureVente[]): FactureVente[] {
   if (list.length === 0) return list;

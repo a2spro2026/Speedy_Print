@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 
 const loginSchema = z.object({
   email: z
@@ -36,28 +35,6 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
-
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="#EA4335"
-        d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.4 14.6 2.4 12 2.4 6.9 2.4 2.7 6.6 2.7 11.7S6.9 21 12 21c5.7 0 9.4-4 9.4-9.6 0-.6-.1-1.1-.2-1.6H12z"
-      />
-    </svg>
-  );
-}
-
-function FacebookIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="#1877F2"
-        d="M24 12.07C24 5.48 18.63.1 12.07.1S.1 5.48.1 12.07c0 5.98 4.38 10.93 10.1 11.83v-8.37H7.2v-3.46h3v-2.64c0-2.96 1.76-4.6 4.46-4.6 1.29 0 2.64.23 2.64.23v2.9h-1.49c-1.46 0-1.92.91-1.92 1.84v2.27h3.27l-.52 3.46h-2.75v8.37C19.62 23 24 18.05 24 12.07z"
-      />
-    </svg>
-  );
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -241,43 +218,6 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <div className="my-6 flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">
-          ou continuer avec
-        </span>
-        <Separator className="flex-1" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11"
-          onClick={() =>
-            toast.message("Google", {
-              description: "Authentification Google bientôt disponible.",
-            })
-          }
-        >
-          <GoogleIcon className="h-4 w-4" />
-          Google
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11"
-          onClick={() =>
-            toast.message("Facebook", {
-              description: "Authentification Facebook bientôt disponible.",
-            })
-          }
-        >
-          <FacebookIcon className="h-4 w-4" />
-          Facebook
-        </Button>
-      </div>
-
       <p className="mt-7 text-center text-sm text-muted">
         Vous n&apos;avez pas de compte ?{" "}
         <button
@@ -291,6 +231,10 @@ export function LoginForm() {
         >
           Contactez l&apos;administrateur
         </button>
+      </p>
+
+      <p className="mt-6 text-center text-xs font-medium tracking-wide text-muted">
+        2026 A2s---Solution Qui Gére.
       </p>
     </motion.div>
   );

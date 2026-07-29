@@ -160,6 +160,7 @@ export default function ReglementClientPage() {
   const [factures, setFactures] = useState<FactureVente[]>([]);
   const [mode, setMode] = useState<FormMode | null>(null);
   const [ready, setReady] = useState(false);
+  const [prefillDone, setPrefillDone] = useState(false);
 
   const {
     register,
@@ -204,6 +205,49 @@ export default function ReglementClientPage() {
     setFactures(loadFacturesVente());
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!ready || prefillDone) return;
+    const factureId =
+      typeof window !== "undefined"
+        ? (new URLSearchParams(window.location.search).get("factureId") || "").trim()
+        : "";
+    if (!factureId) {
+      setPrefillDone(true);
+      return;
+    }
+    const regs = loadReglementsClient();
+    const facts = loadFacturesVente();
+    const f = facts.find((x) => x.id === factureId);
+    if (!f) {
+      toast.error("Facture introuvable pour le règlement.");
+      setPrefillDone(true);
+      return;
+    }
+    const mf = f.montantFacture ?? 0;
+    reset({
+      id: nextReglementId(regs),
+      date: todayISO(),
+      factureId: f.id,
+      refFacture: f.numeroFacture,
+      clientId: f.clientId,
+      nomClient: f.nomClient,
+      montantFacture: toMoneyInput(mf),
+      montantPaye: toMoneyInput(mf),
+      solde: toMoneyInput(0),
+      modeReglement: f.typeReglement || "Vir",
+      numeroRegl: "",
+      bnqRegl: "",
+      nomTire: "",
+      dateEncaisse: f.echeance || todayISO(),
+      statut: "Non",
+    });
+    setMode("create");
+    setPrefillDone(true);
+    toast.message("Règlement prérempli", {
+      description: `Facture ${f.numeroFacture} — saisissez le paiement.`,
+    });
+  }, [ready, prefillDone, reset]);
 
   useEffect(() => {
     if (!mode || mode === "view") return;
