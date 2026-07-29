@@ -160,8 +160,8 @@ function toFormValues(f: FactureVente): FormValues {
   };
 }
 
-function onPrintFacture(f: FactureVente, withLetterhead: boolean) {
-  const ok = printFactureVente(f, { withLetterhead });
+async function onPrintFacture(f: FactureVente, withLetterhead: boolean) {
+  const ok = await printFactureVente(f, { withLetterhead });
   if (!ok) {
     toast.error("Impossible de lancer l'impression. Réessayez.");
   }
@@ -472,7 +472,13 @@ export default function FactureVentePage() {
 
   return (
     <>
-    <div className="space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
+    <div
+      className={
+        mode
+          ? "flex h-[calc(100dvh-4.5rem)] flex-col overflow-hidden px-4 pb-3 pt-1 md:px-6 md:pb-4 md:pt-2"
+          : "space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2"
+      }
+    >
       {!mode && (
         <div className="flex justify-end">
           <Button type="button" onClick={openNouveau}>
@@ -485,8 +491,9 @@ export default function FactureVentePage() {
       {mode && (
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-white to-slate-50/40 p-3 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.25)] md:p-4"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-white to-slate-50/40 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.25)]"
         >
+          <div className="sticky top-0 z-20 shrink-0 border-b border-slate-200/80 bg-white/95 p-3 backdrop-blur-sm md:p-4">
           <div className="flex flex-wrap gap-x-3 gap-y-3">
             <div className="min-w-[150px] flex-1">
               <Field label="Mois" error={errors.mois?.message}>
@@ -635,16 +642,15 @@ export default function FactureVentePage() {
               </Field>
             </div>
           </div>
+          </div>
 
           <input type="hidden" {...register("id")} />
           <input type="hidden" {...register("nomClient")} />
 
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
-              <p className="block w-full text-center text-[10px] font-bold uppercase tracking-[0.14em]">
-                <span className="bg-gradient-to-r from-brand to-violet bg-clip-text text-transparent">
-                  Désignations
-                </span>
+          <div className="mx-3 mb-0 mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm md:mx-4">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                Désignations
               </p>
               {!readOnly && (
                 <Button
@@ -658,9 +664,9 @@ export default function FactureVentePage() {
               )}
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full min-w-[900px] border-collapse text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-900 text-center text-[11px] font-bold uppercase tracking-wide text-white">
                     <th className="w-[96px] px-2 py-2.5">Réf</th>
                     <th className="min-w-[180px] px-2 py-2.5 text-left">
@@ -804,7 +810,7 @@ export default function FactureVentePage() {
               </table>
             </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                   Total facture
                 </span>
@@ -814,7 +820,7 @@ export default function FactureVentePage() {
               </div>
           </div>
 
-          <div className="mt-4 flex justify-end gap-2 border-t border-slate-100/80 pt-3">
+          <div className="sticky bottom-0 z-20 mt-auto flex shrink-0 justify-end gap-2 border-t border-slate-200/80 bg-white/95 px-3 py-3 backdrop-blur-sm md:px-4">
             {mode === "view" ? (
               <>
                 <Button
@@ -1013,7 +1019,7 @@ export default function FactureVentePage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const f = printTarget;
-                  onPrintFacture(f, true);
+                  void onPrintFacture(f, true);
                   setPrintTarget(null);
                 }}
               >
@@ -1032,7 +1038,7 @@ export default function FactureVentePage() {
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5"
                 onClick={() => {
                   const f = printTarget;
-                  onPrintFacture(f, false);
+                  void onPrintFacture(f, false);
                   setPrintTarget(null);
                 }}
               >
