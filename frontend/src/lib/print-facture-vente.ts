@@ -496,11 +496,8 @@ function paginate(m: Metrics): number[] {
       SUITE_RESERVE;
     let used = 0;
     let count = 0;
-    while (
-      count < 8 &&
-      i + count < total &&
-      used + m.rowH[i + count] <= cap
-    ) {
+    // Remplit la feuille jusqu'au pied de page (pas de plafond fixe).
+    while (i + count < total && used + m.rowH[i + count] <= cap) {
       used += m.rowH[i + count];
       count += 1;
     }
@@ -538,16 +535,27 @@ function paginate(m: Metrics): number[] {
   return pages.map((p) => p.length);
 }
 
-/** Répartition de secours si la mesure navigateur n'est pas disponible. */
+/**
+ * Répartition de secours si la mesure navigateur n'est pas disponible.
+ * Capacités larges (remplissage jusqu'au pied) — la mesure réelle prime.
+ */
 function fallbackChunks(count: number): number[] {
   if (count === 0) return [0];
+  const FIRST = 12;
+  const MID = 18;
+  const LAST = 10;
+  if (count <= LAST) return [count];
+
   const sizes: number[] = [];
   let rest = count;
-  while (rest > 0) {
-    const take = Math.min(8, rest);
+  sizes.push(Math.min(FIRST, rest));
+  rest -= sizes[0];
+  while (rest > LAST) {
+    const take = Math.min(MID, rest);
     sizes.push(take);
     rest -= take;
   }
+  if (rest > 0) sizes.push(rest);
   return sizes;
 }
 
