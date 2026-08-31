@@ -102,6 +102,9 @@ export default function BalanceClientPage() {
 
   return (
     <div className="space-y-3 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
+      <p className="text-center text-xs text-muted">
+        Total Factures = factures vente uniquement (hors devis)
+      </p>
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] border-collapse text-center text-sm">

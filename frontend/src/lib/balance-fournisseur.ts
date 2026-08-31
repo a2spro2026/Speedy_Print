@@ -15,28 +15,31 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Somme des factures achat uniquement (hors bons de commande). */
+export function sumFacturesAchatFournisseur(fournisseurId: string): number {
+  return loadFacturesAchat()
+    .filter((fa) => fa.fournisseurId === fournisseurId)
+    .reduce((s, fa) => {
+      const sign = fa.base === "Avoir" ? -1 : 1;
+      return s + sign * (Number(fa.montantFacture) || 0);
+    }, 0);
+}
+
 export function buildBalanceFournisseur(): LigneBalanceFournisseur[] {
-  const factures = loadFacturesAchat();
   const reglements = loadReglements();
 
   return loadFournisseurs()
     .map((f) => {
-      const montantFactures = factures
-        .filter((fa) => fa.fournisseurId === f.id)
-        .reduce((s, fa) => {
-          const sign = fa.base === "Avoir" ? -1 : 1;
-          return s + sign * (Number(fa.montantFacture) || 0);
-        }, 0);
-
-      const totalFactures = round2(
-        (Number(f.soldeInitial) || 0) + montantFactures
-      );
+      const montantFactures = sumFacturesAchatFournisseur(f.id);
+      const totalFactures = round2(montantFactures);
       const totalPaye = round2(
         reglements
           .filter((r) => r.fournisseurId === f.id)
           .reduce((s, r) => s + (Number(r.montantPaye) || 0), 0)
       );
-      const totalSolde = round2(totalFactures - totalPaye);
+      const totalSolde = round2(
+        (Number(f.soldeInitial) || 0) + montantFactures - totalPaye
+      );
 
       return {
         date: f.date,
