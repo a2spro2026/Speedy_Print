@@ -4,6 +4,7 @@ const BUSINESS_KEYS = [
   "speedyprint.fournisseurs",
   "speedyprint.devis",
   "speedyprint.factures-achat",
+  "speedyprint.bons-commande-achat",
   "speedyprint.factures-vente",
   "speedyprint.reglements-client",
   "speedyprint.reglements-fournisseur",

@@ -33,13 +33,29 @@ type NavChild = {
   icon: ComponentType<{ className?: string }>;
 };
 
+type NavItem =
+  | NavChild
+  | {
+      label: string;
+      icon: ComponentType<{ className?: string }>;
+      children: NavChild[];
+    };
+
 type NavGroup = {
   id: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   accent: string;
-  children: NavChild[];
+  children: NavItem[];
 };
+
+function isNavGroup(item: NavItem): item is { label: string; icon: ComponentType<{ className?: string }>; children: NavChild[] } {
+  return "children" in item;
+}
+
+function itemHrefs(item: NavItem): string[] {
+  return isNavGroup(item) ? item.children.map((c) => c.href) : [item.href];
+}
 
 const groups: NavGroup[] = [
   {
@@ -49,7 +65,14 @@ const groups: NavGroup[] = [
     accent: "from-violet-500 to-purple-600",
     children: [
       { label: "Fiche Fournisseur", href: "/dashboard/fournisseurs/fiches", icon: Building2 },
-      { label: "Facture Achat", href: "/dashboard/fournisseurs/factures", icon: Receipt },
+      {
+        label: "Facture Achat",
+        icon: Receipt,
+        children: [
+          { label: "Facture Achat", href: "/dashboard/fournisseurs/factures", icon: Receipt },
+          { label: "Bon de Commande", href: "/dashboard/fournisseurs/bon-commande", icon: ClipboardList },
+        ],
+      },
       { label: "Règlement", href: "/dashboard/fournisseurs/reglements", icon: Wallet },
       { label: "Balance", href: "/dashboard/fournisseurs/balance", icon: Scale },
     ],
@@ -117,21 +140,42 @@ type AppSidebarProps = {
 export function AppSidebar({ onLogout }: AppSidebarProps) {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const [openSubmenus, setOpenSubmenus] = useState<string[]>([]);
 
   useEffect(() => {
     const active = groups.find((group) =>
-      group.children.some((child) => pathname.startsWith(child.href))
+      group.children.some((child) =>
+        itemHrefs(child).some((href) => pathname.startsWith(href))
+      )
     );
     if (active) {
       setOpenGroups((prev) =>
         prev.includes(active.id) ? prev : [...prev, active.id]
       );
+      active.children.forEach((child) => {
+        if (isNavGroup(child)) {
+          const subActive = child.children.some((c) =>
+            pathname.startsWith(c.href)
+          );
+          if (subActive) {
+            setOpenSubmenus((prev) =>
+              prev.includes(child.label) ? prev : [...prev, child.label]
+            );
+          }
+        }
+      });
     }
   }, [pathname]);
 
   const toggleGroup = (id: string) => {
     setOpenGroups((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSubmenu = (label: string) => {
+    setOpenSubmenus((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
     );
   };
 
@@ -185,7 +229,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
         {groups.map((group) => {
           const open = openGroups.includes(group.id);
           const childActive = group.children.some((child) =>
-            pathname.startsWith(child.href)
+            itemHrefs(child).some((href) => pathname.startsWith(href))
           );
 
           return (
@@ -235,6 +279,74 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                   >
                     <div className="space-y-1 px-2 pb-2 pt-1">
                       {group.children.map((child) => {
+                        if (isNavGroup(child)) {
+                          const subOpen = openSubmenus.includes(child.label);
+                          const subActive = child.children.some((c) =>
+                            pathname.startsWith(c.href)
+                          );
+                          return (
+                            <div key={child.label} className="space-y-0.5">
+                              <button
+                                type="button"
+                                onClick={() => toggleSubmenu(child.label)}
+                                className={cn(
+                                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition",
+                                  subActive || subOpen
+                                    ? "bg-white/10 text-white"
+                                    : "text-white/65 hover:bg-white/8 hover:text-white"
+                                )}
+                                aria-expanded={subOpen}
+                              >
+                                <child.icon className="h-3.5 w-3.5 opacity-70" />
+                                <span className="flex-1 text-left">{child.label}</span>
+                                <ChevronDown
+                                  className={cn(
+                                    "h-3.5 w-3.5 text-white/50 transition-transform duration-300",
+                                    subOpen && "rotate-180"
+                                  )}
+                                />
+                              </button>
+                              <AnimatePresence initial={false}>
+                                {subOpen && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="ml-3 space-y-0.5 border-l border-white/10 pl-2">
+                                      {child.children.map((sub) => {
+                                        const active = pathname.startsWith(sub.href);
+                                        return (
+                                          <Link
+                                            key={sub.href}
+                                            href={sub.href}
+                                            className={cn(
+                                              "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] font-medium transition",
+                                              active
+                                                ? "bg-white text-slate-900 shadow-md shadow-black/20"
+                                                : "text-white/60 hover:bg-white/8 hover:text-white"
+                                            )}
+                                          >
+                                            <sub.icon
+                                              className={cn(
+                                                "h-3 w-3",
+                                                active ? "text-brand" : "opacity-70"
+                                              )}
+                                            />
+                                            {sub.label}
+                                          </Link>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        }
+
                         const active = pathname.startsWith(child.href);
                         return (
                           <Link

@@ -38,6 +38,10 @@ const titles: Record<string, { title: string; subtitle: string }> = {
     title: "Saisie Nouvelle Facture",
     subtitle: "",
   },
+  "/dashboard/fournisseurs/bon-commande": {
+    title: "Saisie Bon de Commande",
+    subtitle: "",
+  },
   "/dashboard/fournisseurs/reglements": {
     title: "Saisie Nouveau Règlement",
     subtitle: "",
@@ -69,6 +73,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { user, ready } = useRequireAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
   // Une fois : vider les données de saisie locales (livraison client)
   useEffect(() => {
@@ -110,10 +115,12 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-dvh bg-surface">
-      {/* Desktop : sidebar fixe */}
-      <div className="sticky top-0 hidden h-dvh md:block">
-        <AppSidebar onLogout={logout} />
-      </div>
+      {/* Desktop : sidebar fixe (masquable) */}
+      {desktopSidebarOpen ? (
+        <div className="sticky top-0 hidden h-dvh md:block">
+          <AppSidebar onLogout={logout} />
+        </div>
+      ) : null}
 
       {/* Mobile : overlay + tiroir latéral */}
       {mobileMenuOpen ? (
@@ -136,6 +143,8 @@ export default function DashboardLayout({
           subtitle={meta.subtitle}
           menuOpen={mobileMenuOpen}
           onMenuClick={() => setMobileMenuOpen((o) => !o)}
+          sidebarOpen={desktopSidebarOpen}
+          onSidebarToggle={() => setDesktopSidebarOpen((o) => !o)}
         />
         <div className="min-h-0 flex-1">{children}</div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
+import { Menu, PanelLeft, PanelLeftClose, X } from "lucide-react";
 
 type AppNavbarProps = {
   title: string;
@@ -9,6 +9,9 @@ type AppNavbarProps = {
   /** Bouton menu mobile (ouvre la liste latérale). */
   onMenuClick?: () => void;
   menuOpen?: boolean;
+  /** Bouton afficher/masquer le panneau latéral (desktop). */
+  onSidebarToggle?: () => void;
+  sidebarOpen?: boolean;
 };
 
 export function AppNavbar({
@@ -16,6 +19,8 @@ export function AppNavbar({
   subtitle,
   onMenuClick,
   menuOpen = false,
+  onSidebarToggle,
+  sidebarOpen = true,
 }: AppNavbarProps) {
   const isBrandHome = title === "SpeedyPrint";
 
@@ -23,6 +28,26 @@ export function AppNavbar({
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
       <div className="flex h-[60px] items-center justify-between gap-3 px-3 md:gap-4 md:px-6">
         <div className="flex min-w-0 items-center gap-2">
+          {onSidebarToggle ? (
+            <button
+              type="button"
+              onClick={onSidebarToggle}
+              aria-label={
+                sidebarOpen
+                  ? "Masquer le panneau latéral"
+                  : "Afficher le panneau latéral"
+              }
+              aria-expanded={sidebarOpen}
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 md:inline-flex"
+            >
+              {sidebarOpen ? (
+                <PanelLeftClose className="h-5 w-5" />
+              ) : (
+                <PanelLeft className="h-5 w-5" />
+              )}
+            </button>
+          ) : null}
+
           {onMenuClick ? (
             <button
               type="button"
