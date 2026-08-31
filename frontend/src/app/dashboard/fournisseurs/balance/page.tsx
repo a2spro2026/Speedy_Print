@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Printer, X } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   buildBalanceFournisseur,
   type LigneBalanceFournisseur,
@@ -11,40 +12,49 @@ import {
 import { formatDateFR } from "@/lib/fournisseurs";
 import { formatMoney, moneyTone } from "@/lib/money";
 
-function printBalance(row: LigneBalanceFournisseur) {
-  const win = window.open("", "_blank", "noopener,noreferrer,width=800,height=700");
+function printBalanceRows(
+  rows: LigneBalanceFournisseur[],
+  title: string
+) {
+  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=800");
   if (!win) {
     toast.error("Impossible d'ouvrir la fenêtre d'impression.");
     return;
   }
 
-  const lines = [
-    ["Date", formatDateFR(row.date)],
-    ["ID", row.id],
-    ["Nom Fournisseur", row.nomFournisseur],
-    ["Total Factures", formatMoney(row.totalFactures)],
-    ["Total Payé", formatMoney(row.totalPaye)],
-    ["Total Solde", formatMoney(row.totalSolde)],
-  ]
+  const body = rows
     .map(
-      ([k, v]) =>
-        `<tr><th style="text-align:left;padding:8px 12px;border-bottom:1px solid #e5e7eb;width:40%">${k}</th><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${v}</td></tr>`
+      (r) =>
+        `<tr>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${formatDateFR(r.date)}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${r.id}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee">${r.nomFournisseur}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${formatMoney(r.totalFactures)}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${formatMoney(r.totalPaye)}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${formatMoney(r.totalSolde)}</td>
+        </tr>`
     )
     .join("");
 
   win.document.write(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"/>
-<title>Balance ${row.id}</title>
+<title>${title}</title>
 <style>
-  body{font-family:Georgia,'Times New Roman',serif;color:#111;padding:32px;max-width:720px;margin:0 auto}
+  body{font-family:Georgia,'Times New Roman',serif;color:#111;padding:32px;max-width:960px;margin:0 auto}
   h1{font-size:22px;margin:0 0 4px}
   p{color:#666;margin:0 0 24px;font-size:14px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#f8fafc;padding:8px;border-bottom:2px solid #e5e7eb}
   @media print{body{padding:0}}
 </style></head><body>
-  <h1>SpeedyPrint — Balance Fournisseur</h1>
-  <p>${row.nomFournisseur} · ${row.id}</p>
-  <table>${lines}</table>
+  <h1>SpeedyPrint — ${title}</h1>
+  <p>Factures achat uniquement (hors bons de commande)</p>
+  <table>
+    <thead><tr>
+      <th>Date</th><th>ID</th><th>Nom Fournisseur</th><th>Total Factures</th><th>Total Payé</th><th>Total Solde</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>
   <script>window.onload=function(){window.print()}</script>
 </body></html>`);
   win.document.close();
@@ -84,12 +94,20 @@ export default function BalanceFournisseurPage() {
     );
   }, [rows]);
 
-  function onFermer(row: LigneBalanceFournisseur) {
-    if (selectedId === row.id) {
-      setSelectedId(null);
+  function onImprimer() {
+    if (rows.length === 0) {
+      toast.error("Aucune ligne à imprimer.");
       return;
     }
-    router.push("/dashboard");
+    const selected = selectedId
+      ? rows.filter((r) => r.id === selectedId)
+      : rows;
+    printBalanceRows(
+      selected,
+      selected.length === 1
+        ? `Balance Fournisseur — ${selected[0].nomFournisseur}`
+        : "Balance Fournisseur"
+    );
   }
 
   if (!ready) {
@@ -105,9 +123,23 @@ export default function BalanceFournisseurPage() {
       <p className="text-center text-xs text-muted">
         Total Factures = factures achat uniquement (hors bons de commande)
       </p>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onImprimer}>
+          <Printer className="h-4 w-4" />
+          Imprimer
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push("/dashboard")}
+        >
+          <X className="h-4 w-4" />
+          Fermer
+        </Button>
+      </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] border-collapse text-center text-sm">
+          <table className="w-full min-w-[800px] border-collapse text-center text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
                 <th className="px-3 py-3.5 text-[12px] font-bold">Date</th>
@@ -116,15 +148,13 @@ export default function BalanceFournisseurPage() {
                 <th className="px-3 py-3.5 text-[12px] font-bold">Total Factures</th>
                 <th className="px-3 py-3.5 text-[12px] font-bold">Total Payé</th>
                 <th className="px-3 py-3.5 text-[12px] font-bold">Total Solde</th>
-                <th className="px-3 py-3.5 text-[12px] font-bold">Imprimer</th>
-                <th className="px-3 py-3.5 text-[12px] font-bold">Fermer</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={6}
                     className="px-4 py-14 text-center text-sm text-muted"
                   >
                     Aucun fournisseur. Créez des fiches dans{" "}
@@ -160,34 +190,6 @@ export default function BalanceFournisseurPage() {
                     <td className={`px-3 py-3 font-bold tabular-nums ${moneyTone.solde}`}>
                       {formatMoney(r.totalSolde)}
                     </td>
-                    <td className="px-2 py-2">
-                      <div className="flex items-center justify-center">
-                        <ActionBtn
-                          label="Imprimer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            printBalance(r);
-                          }}
-                          className="text-slate-700 hover:bg-slate-100"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </ActionBtn>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex items-center justify-center">
-                        <ActionBtn
-                          label="Fermer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onFermer(r);
-                          }}
-                          className="text-rose-700 hover:bg-rose-50"
-                        >
-                          <X className="h-4 w-4" />
-                        </ActionBtn>
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}
@@ -207,7 +209,6 @@ export default function BalanceFournisseurPage() {
                   <td className={`px-3 py-3 tabular-nums ${moneyTone.solde}`}>
                     {formatMoney(totals.solde)}
                   </td>
-                  <td colSpan={2} />
                 </tr>
               </tfoot>
             )}
@@ -215,29 +216,5 @@ export default function BalanceFournisseurPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ActionBtn({
-  label,
-  onClick,
-  className,
-  children,
-}: {
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${className ?? ""}`}
-    >
-      {children}
-    </button>
   );
 }
