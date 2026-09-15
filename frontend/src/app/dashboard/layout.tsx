@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppNavbar } from "@/components/layout/app-navbar";
 import { signOut } from "@/lib/auth";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { wipeBusinessDataOnce } from "@/lib/wipe-business-data";
+import { hydrateBusinessStore } from "@/lib/business-store";
 
 const titles: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": {
@@ -74,10 +74,13 @@ export default function DashboardLayout({
   const { user, ready } = useRequireAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
-  // Une fois : vider les données de saisie locales (livraison client)
+  // Charger les données partagées depuis le serveur
   useEffect(() => {
-    wipeBusinessDataOnce();
+    hydrateBusinessStore()
+      .then(() => setDataReady(true))
+      .catch(() => setDataReady(true));
   }, []);
 
   // Fermer le tiroir à chaque navigation
@@ -95,7 +98,7 @@ export default function DashboardLayout({
     };
   }, [mobileMenuOpen]);
 
-  if (!ready || !user) {
+  if (!ready || !user || !dataReady) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-surface text-muted">
         Chargement de votre espace…

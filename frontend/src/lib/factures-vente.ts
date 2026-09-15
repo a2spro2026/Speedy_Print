@@ -4,6 +4,7 @@ import {
   normalizeTypeReglement,
   type TypeReglement,
 } from "@/lib/clients";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 import type { Devis } from "@/lib/devis";
 
 export type TypeFacture = "Exonéré" | "HT" | "TTC";
@@ -299,9 +300,7 @@ export function emptyLigne(): LigneFactureVente {
 export function loadFacturesVente(): FactureVente[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as FactureVente[];
+    const parsed = readJsonStore<FactureVente[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return migrateFactureNumeros(
       parsed.map((f) => ({
@@ -321,7 +320,7 @@ export function loadFacturesVente(): FactureVente[] {
 }
 
 export function saveFacturesVente(list: FactureVente[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }
 
 /** Force le préfixe BC- sur le n° de bon de commande. */

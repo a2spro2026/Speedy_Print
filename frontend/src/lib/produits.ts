@@ -1,3 +1,5 @@
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
+
 export type Produit = {
   ref: string; // Pro0001
   designation: string;
@@ -26,9 +28,7 @@ export function nextProduitRef(existing: Produit[]): string {
 export function loadProduits(): Produit[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Produit[];
+    const parsed = readJsonStore<Produit[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((p) => ({
       ref: p.ref,
@@ -45,5 +45,5 @@ export function loadProduits(): Produit[] {
 }
 
 export function saveProduits(list: Produit[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }

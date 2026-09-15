@@ -1,3 +1,5 @@
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
+
 export type TypeReglement =
   | "Esp"
   | "Chq"
@@ -82,20 +84,121 @@ export function nextFournisseurId(existing: Fournisseur[]): string {
 export function loadFournisseurs(): Fournisseur[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Fournisseur[];
+    const parsed = readJsonStore<Fournisseur[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((f) => ({
+    const mapped = parsed.map((f) => ({
       ...f,
+      nom: String(f.nom ?? "").trim().replace(/\s+/g, " "),
       typeReglement: normalizeTypeReglement(f.typeReglement),
       soldeInitial: Number(f.soldeInitial) || 0,
     }));
+    const deduped = dedupeFournisseursByNom(mapped);
+    if (deduped.length !== mapped.length) {
+      writeJsonStore(STORAGE_KEY, deduped);
+    }
+    return deduped;
   } catch {
     return [];
   }
 }
 
 export function saveFournisseurs(list: Fournisseur[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
+}
+
+/** Normalise un nom pour détecter les doublons (casse, espaces, accents). */
+export function normalizeNomFournisseur(nom: string): string {
+  return nom
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/** Fusionne les fiches qui partagent le même nom normalisé. */
+export function dedupeFournisseursByNom(list: Fournisseur[]): Fournisseur[] {
+  const byKey = new Map<string, Fournisseur>();
+  const order: string[] = [];
+
+  for (const f of list) {
+    const key = normalizeNomFournisseur(f.nom);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, { ...f, nom: f.nom.trim().replace(/\s+/g, " ") });
+      order.push(key);
+      continue;
+    }
+    byKey.set(key, {
+      ...prev,
+      nom: prev.nom.trim().replace(/\s+/g, " "),
+      contact: prev.contact || f.contact,
+      ville: prev.ville || f.ville,
+      typeReglement: prev.typeReglement || f.typeReglement,
+      banque: prev.banque || f.banque,
+      rc: prev.rc || f.rc,
+      ice: prev.ice || f.ice,
+      rib: prev.rib || f.rib,
+      soldeInitial: prev.soldeInitial || f.soldeInitial,
+      date: prev.date <= f.date ? prev.date : f.date,
+    });
+  }
+
+  return order.map((k) => byKey.get(k)!);
+}
+
+/**
+ * Crée ou met à jour une fiche fournisseur à partir d'un bon de commande
+ * ou d'une facture d'achat. Le nom (normalisé) prime pour éviter les doublons.
+ */
+export function upsertFournisseurFromDocument(args: {
+  fournisseurId?: string;
+  nom: string;
+  ice?: string;
+  typeReglement?: TypeReglement;
+  date?: string;
+}): Fournisseur {
+  const list = dedupeFournisseursByNom(loadFournisseurs());
+  const nom = args.nom.trim().replace(/\s+/g, " ");
+  const ice = (args.ice ?? "").trim();
+  const nomKey = normalizeNomFournisseur(nom);
+
+  // 1) Anti-doublon : priorité au nom (même écriture / casse / accents)
+  let existing = nomKey
+    ? list.find((f) => normalizeNomFournisseur(f.nom) === nomKey)
+    : undefined;
+
+  // 2) Sinon, reprendre la fiche liée à l'ID du document (renommage)
+  if (!existing && args.fournisseurId) {
+    existing = list.find((f) => f.id === args.fournisseurId);
+  }
+
+  if (existing) {
+    const updated: Fournisseur = {
+      ...existing,
+      nom,
+      ice: ice || existing.ice,
+      typeReglement: args.typeReglement ?? existing.typeReglement,
+    };
+    const next = list.map((f) => (f.id === existing!.id ? updated : f));
+    saveFournisseurs(dedupeFournisseursByNom(next));
+    return updated;
+  }
+
+  const created: Fournisseur = {
+    id: nextFournisseurId(list),
+    date: args.date || todayISO(),
+    nom,
+    contact: "",
+    ville: "",
+    typeReglement: args.typeReglement ?? "Vir",
+    banque: "",
+    rc: "",
+    ice,
+    rib: "",
+    soldeInitial: 0,
+  };
+  saveFournisseurs([created, ...list]);
+  return created;
 }

@@ -11,7 +11,7 @@ import {
   EyeOff,
   Loader2,
   Lock,
-  Mail,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,10 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "L'email est requis.")
-    .email("Veuillez saisir un email valide."),
+  email: z.string().min(1, "L'identifiant est requis."),
   password: z
     .string()
     .min(1, "Le mot de passe est requis.")
@@ -49,23 +46,17 @@ export function LoginForm() {
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "admin@speedyprint.fr",
+      email: "",
       password: "",
-      remember: true,
+      remember: false,
     },
   });
 
   useEffect(() => {
     if (isAuthenticated()) {
       router.replace("/dashboard");
-      return;
     }
-    const remembered = localStorage.getItem("speedyprint.remember");
-    if (remembered) {
-      setValue("email", remembered);
-      setValue("remember", true);
-    }
-  }, [router, setValue]);
+  }, [router]);
 
   const remember = watch("remember");
 
@@ -110,19 +101,24 @@ export function LoginForm() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-4"
+        noValidate
+        autoComplete="off"
+      >
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Identifiant</Label>
           <div className="relative">
-            <Mail
+            <User
               className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               aria-hidden
             />
             <Input
               id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="exemple@email.com"
+              type="text"
+              autoComplete="off"
+              placeholder="Identifiant"
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? "email-error" : undefined}
               className="pl-11"
@@ -146,8 +142,8 @@ export function LoginForm() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              placeholder="••••••••"
+              autoComplete="off"
+              placeholder="Mot de passe"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? "password-error" : undefined}
               className="px-11"

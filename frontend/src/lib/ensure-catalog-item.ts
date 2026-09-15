@@ -108,3 +108,63 @@ export function ensureCatalogItem(opts: {
   saveProduits([created, ...list]);
   return { ref: created.ref, kind: "produit", created: true };
 }
+
+/**
+ * Article saisi sur facture d'achat → fiche produit (stock à facturer en vente).
+ * Met à jour le prix d'achat ; ne touche pas au prix de vente s'il existe déjà.
+ */
+export function ensureProduitFromAchat(opts: {
+  designation: string;
+  prixAchat: number;
+  ref?: string;
+}): { ref: string; created: boolean } {
+  const designation = opts.designation.trim().replace(/\s+/g, " ");
+  const prixAchat = Number(opts.prixAchat) || 0;
+  const wantedRef = (opts.ref ?? "").trim();
+
+  if (!designation) {
+    return { ref: wantedRef, created: false };
+  }
+
+  const list = loadProduits();
+  const byRef = wantedRef
+    ? list.find((p) => p.ref.toLowerCase() === wantedRef.toLowerCase())
+    : undefined;
+  const byName = list.find((p) => norm(p.designation) === norm(designation));
+  const existing = byRef ?? byName;
+
+  if (existing) {
+    const next = list.map((p) =>
+      p.ref === existing.ref
+        ? {
+            ...p,
+            designation,
+            prixAchat: prixAchat > 0 ? prixAchat : p.prixAchat,
+            actif: true,
+          }
+        : p
+    );
+    saveProduits(next);
+    return { ref: existing.ref, created: false };
+  }
+
+  let ref =
+    wantedRef && /^Pro\d+$/i.test(wantedRef)
+      ? wantedRef
+      : nextProduitRef(list);
+  if (list.some((p) => p.ref.toLowerCase() === ref.toLowerCase())) {
+    ref = nextProduitRef(list);
+  }
+
+  const created: Produit = {
+    ref,
+    designation,
+    qteInitiale: 0,
+    achats: 0,
+    prixAchat,
+    prixVente: 0,
+    actif: true,
+  };
+  saveProduits([created, ...list]);
+  return { ref: created.ref, created: true };
+}

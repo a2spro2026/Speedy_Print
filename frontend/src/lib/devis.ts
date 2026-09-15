@@ -1,4 +1,5 @@
 import { TYPES_REGLEMENT, normalizeTypeReglement, type TypeReglement } from "@/lib/clients";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 
 export type TypeFacture = "Exonéré" | "HT" | "TTC";
 export type BaseDevis = "Devis";
@@ -168,9 +169,7 @@ export function emptyLigne(): LigneDevis {
 export function loadDevis(): Devis[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Devis[];
+    const parsed = readJsonStore<Devis[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((d) => ({
       ...d,
@@ -187,5 +186,5 @@ export function loadDevis(): Devis[] {
 }
 
 export function saveDevis(list: Devis[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }

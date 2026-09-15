@@ -3,6 +3,7 @@ import {
   normalizeTypeReglement,
   type TypeReglement,
 } from "@/lib/clients";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 
 export type ReglementClient = {
   id: string; // RGC-xxxx
@@ -64,9 +65,7 @@ export function calcSolde(montantFacture: number, montantPaye: number): number {
 export function loadReglementsClient(): ReglementClient[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partial<ReglementClient>[];
+    const parsed = readJsonStore<Partial<ReglementClient>[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((r) => {
       const montantFacture = Number(r.montantFacture) || 0;
@@ -100,5 +99,5 @@ export function loadReglementsClient(): ReglementClient[] {
 }
 
 export function saveReglementsClient(list: ReglementClient[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }

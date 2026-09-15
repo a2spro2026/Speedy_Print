@@ -7,11 +7,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
-import { loadFournisseurs, type Fournisseur } from "@/lib/fournisseurs";
-import { loadProduits, type Produit } from "@/lib/produits";
+import {
+  loadFournisseurs,
+  normalizeNomFournisseur,
+  upsertFournisseurFromDocument,
+  type Fournisseur,
+  type TypeReglement,
+} from "@/lib/fournisseurs";
+import { ensureProduitFromAchat } from "@/lib/ensure-catalog-item";
 import {
   BASES_FACTURE,
   TYPES_FACTURE,
@@ -30,7 +37,6 @@ import {
   totalFacture,
   type FactureAchat,
   type TypeFacture,
-  type TypeReglement,
 } from "@/lib/factures-achat";
 
 const ligneSchema = z.object({
@@ -51,8 +57,8 @@ const schema = z.object({
   base: z.enum(["Achat", "Avoir"]),
   numeroFacture: z.string().min(1, "N° facture obligatoire"),
   id: z.string(), // interne FA-
-  fournisseurId: z.string().min(1, "Fournisseur obligatoire"),
-  nomFournisseur: z.string().min(1),
+  fournisseurId: z.string().optional(),
+  nomFournisseur: z.string().min(1, "Nom fournisseur obligatoire"),
   ice: z.string().optional(),
   typeReglement: z.enum([
     "Esp",
@@ -81,8 +87,6 @@ const inputReadonly =
 /** Cellules tableau désignations */
 const inputSheet =
   "h-9 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm shadow-none focus-visible:ring-1 focus-visible:ring-brand/30";
-const selectSheet =
-  "flex h-9 w-full rounded-lg border border-slate-200 bg-white px-1.5 text-center text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/30 disabled:opacity-60";
 
 function num(v: string): number {
   const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
@@ -190,7 +194,6 @@ function printFacture(f: FactureAchat) {
 export default function FactureAchatPage() {
   const [list, setList] = useState<FactureAchat[]>([]);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
-  const [produits, setProduits] = useState<Produit[]>([]);
   const [mode, setMode] = useState<FormMode | null>(null);
   const [ready, setReady] = useState(false);
   const moisOpts = useMemo(() => moisOptions(), []);
@@ -223,9 +226,9 @@ export default function FactureAchatPage() {
 
   const { fields, append, remove } = useFieldArray({ control, name: "lignes" });
   const watchDate = useWatch({ control, name: "date" });
+  const watchEcheance = useWatch({ control, name: "echeance" });
   const watchType = useWatch({ control, name: "typeFacture" });
   const watchLignes = useWatch({ control, name: "lignes" });
-  const watchFournisseurId = useWatch({ control, name: "fournisseurId" });
 
   const montantTotal = useMemo(() => {
     if (!watchLignes?.length) return 0;
@@ -235,11 +238,6 @@ export default function FactureAchatPage() {
   useEffect(() => {
     setList(loadFacturesAchat());
     setFournisseurs(loadFournisseurs());
-    setProduits(
-      [...loadProduits()].sort((a, b) =>
-        a.designation.localeCompare(b.designation, "fr")
-      )
-    );
     setReady(true);
   }, []);
 
@@ -312,30 +310,21 @@ export default function FactureAchatPage() {
     setMode(null);
   }
 
-  function onFournisseurChange(id: string) {
-    const f = fournisseurs.find((x) => x.id === id);
-    setValue("fournisseurId", id, { shouldValidate: true });
-    setValue("nomFournisseur", f?.nom ?? "", { shouldValidate: true });
-    setValue("ice", f?.ice ?? "");
-  }
-
-  function onProduitChange(index: number, ref: string) {
+  /** Si le nom existe déjà → rattache l'ID / ICE sans créer de doublon. */
+  function linkFournisseurByNom(nomSaisi: string) {
     if (readOnly) return;
-    if (!ref) {
-      setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-      setValue(`lignes.${index}.designation`, "", { shouldValidate: true });
-      return;
+    const key = normalizeNomFournisseur(nomSaisi);
+    if (!key) return;
+    const match = fournisseurs.find(
+      (f) => normalizeNomFournisseur(f.nom) === key
+    );
+    if (!match) return;
+    setValue("fournisseurId", match.id, { shouldValidate: true });
+    setValue("nomFournisseur", match.nom, { shouldValidate: true });
+    if (match.ice) setValue("ice", match.ice);
+    if (match.typeReglement) {
+      setValue("typeReglement", match.typeReglement);
     }
-    const p = produits.find((x) => x.ref === ref);
-    if (!p) return;
-    setValue(`lignes.${index}.ref`, p.ref, { shouldValidate: true });
-    setValue(`lignes.${index}.designation`, p.designation, {
-      shouldValidate: true,
-    });
-    setValue(`lignes.${index}.unite`, "U", { shouldValidate: true });
-    setValue(`lignes.${index}.prixU`, toMoneyInput(p.prixAchat), {
-      shouldValidate: true,
-    });
   }
 
   function onDelete(f: FactureAchat) {
@@ -366,9 +355,15 @@ export default function FactureAchatPage() {
         tva,
         typeFacture: type,
       });
+      const designation = l.designation.trim();
+      const ensured = ensureProduitFromAchat({
+        designation,
+        prixAchat: prixU,
+        ref: l.ref,
+      });
       return {
-        ref: (l.ref ?? "").trim(),
-        designation: l.designation.trim(),
+        ref: ensured.ref,
+        designation,
         qte,
         unite: l.unite,
         prixU,
@@ -378,6 +373,15 @@ export default function FactureAchatPage() {
       };
     });
 
+    const fournisseur = upsertFournisseurFromDocument({
+      fournisseurId: values.fournisseurId,
+      nom: values.nomFournisseur,
+      ice: values.ice,
+      typeReglement: values.typeReglement as TypeReglement,
+      date: values.date,
+    });
+    setFournisseurs(loadFournisseurs());
+
     const row: FactureAchat = {
       id: values.id || nextFactureAchatId(list),
       mois: values.mois,
@@ -385,9 +389,9 @@ export default function FactureAchatPage() {
       typeFacture: type,
       base: values.base,
       numeroFacture: values.numeroFacture.trim(),
-      fournisseurId: values.fournisseurId,
-      nomFournisseur: values.nomFournisseur.trim(),
-      ice: (values.ice ?? "").trim(),
+      fournisseurId: fournisseur.id,
+      nomFournisseur: fournisseur.nom,
+      ice: fournisseur.ice,
       typeReglement: values.typeReglement as TypeReglement,
       echeance: values.echeance,
       lignes,
@@ -454,9 +458,9 @@ export default function FactureAchatPage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Date" error={errors.date?.message}>
-                <Input
-                  {...register("date")}
-                  type="date"
+                <DateFrInput
+                  value={watchDate}
+                  onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />
@@ -518,24 +522,19 @@ export default function FactureAchatPage() {
                 label="Nom Fournisseur"
                 error={errors.nomFournisseur?.message}
               >
-                <select
-                  className={selectClass}
-                  disabled={readOnly}
-                  value={watchFournisseurId || ""}
-                  onChange={(e) => onFournisseurChange(e.target.value)}
-                >
-                  <option value="">— Sélectionner —</option>
+                <Input
+                  {...register("nomFournisseur")}
+                  placeholder="Nom du fournisseur"
+                  readOnly={readOnly}
+                  className={readOnly ? inputReadonly : inputShell}
+                  list="fournisseurs-existants-fa"
+                  onBlur={(e) => linkFournisseurByNom(e.target.value)}
+                />
+                <datalist id="fournisseurs-existants-fa">
                   {fournisseurs.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.nom}
-                    </option>
+                    <option key={f.id} value={f.nom} />
                   ))}
-                </select>
-                {fournisseurs.length === 0 && (
-                  <p className="text-[11px] text-amber-700">
-                    Créez d&apos;abord une fiche fournisseur.
-                  </p>
-                )}
+                </datalist>
               </Field>
             </div>
             <div className="min-w-[140px] flex-1">
@@ -555,9 +554,9 @@ export default function FactureAchatPage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Échéance" error={errors.echeance?.message}>
-                <Input
-                  {...register("echeance")}
-                  type="date"
+                <DateFrInput
+                  value={watchEcheance}
+                  onChange={(iso) => setValue("echeance", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />
@@ -567,16 +566,15 @@ export default function FactureAchatPage() {
               <Field label="ICE" error={errors.ice?.message}>
                 <Input
                   {...register("ice")}
-                  readOnly
-                  className={`${inputReadonly} font-mono text-[13px]`}
-                  placeholder="Auto"
+                  placeholder="ICE"
+                  readOnly={readOnly}
+                  className={`${readOnly ? inputReadonly : inputShell} font-mono text-[13px]`}
                 />
               </Field>
             </div>
           </div>
 
           <input type="hidden" {...register("id")} />
-          <input type="hidden" {...register("nomFournisseur")} />
 
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
@@ -623,31 +621,19 @@ export default function FactureAchatPage() {
                       <td className="p-1.5 align-middle">
                         <Input
                           {...register(`lignes.${index}.ref`)}
-                          readOnly
-                          className={`${inputReadonly} text-center`}
-                          placeholder="—"
+                          readOnly={readOnly}
+                          className={`${readOnly ? inputReadonly : inputSheet} text-center`}
+                          placeholder="Réf"
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <input
-                          type="hidden"
+                        <Input
                           {...register(`lignes.${index}.designation`)}
+                          readOnly={readOnly}
+                          className={`${readOnly ? inputReadonly : inputSheet} text-left`}
+                          placeholder="Désignation"
+                          autoComplete="off"
                         />
-                        <select
-                          className={`${selectSheet} text-center`}
-                          disabled={readOnly}
-                          value={watchLignes?.[index]?.ref || ""}
-                          onChange={(e) =>
-                            onProduitChange(index, e.target.value)
-                          }
-                        >
-                          <option value="">— Produit —</option>
-                          {produits.map((p) => (
-                            <option key={p.ref} value={p.ref}>
-                              {p.designation}
-                            </option>
-                          ))}
-                        </select>
                         {errors.lignes?.[index]?.designation && (
                           <p className="mt-0.5 text-[10px] text-rose-600">
                             {errors.lignes[index]?.designation?.message}
@@ -663,17 +649,18 @@ export default function FactureAchatPage() {
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <select
+                        <Input
                           {...register(`lignes.${index}.unite`)}
-                          className={`${selectSheet} text-center`}
-                          disabled={readOnly}
-                        >
+                          readOnly={readOnly}
+                          className={`${readOnly ? inputReadonly : inputSheet} text-center`}
+                          placeholder="U"
+                          list={`unites-fa-${index}`}
+                        />
+                        <datalist id={`unites-fa-${index}`}>
                           {UNITES.map((u) => (
-                            <option key={u} value={u}>
-                              {u}
-                            </option>
+                            <option key={u} value={u} />
                           ))}
-                        </select>
+                        </datalist>
                       </td>
                       <td className="p-1.5 align-middle">
                         <Input

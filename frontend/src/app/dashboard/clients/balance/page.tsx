@@ -11,6 +11,7 @@ import {
 } from "@/lib/balance-client";
 import { formatDateFR } from "@/lib/clients";
 import { formatMoney, moneyTone } from "@/lib/money";
+import { refreshBusinessStore } from "@/lib/business-store";
 
 function printBalanceRows(rows: LigneBalanceClient[], title: string) {
   const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=800");
@@ -70,12 +71,14 @@ export default function BalanceClientPage() {
 
   useEffect(() => {
     refresh();
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("storage", onFocus);
+    const onRefresh = () => {
+      void refreshBusinessStore().then(refresh);
+    };
+    window.addEventListener("focus", onRefresh);
+    window.addEventListener("speedyprint:data-updated", onRefresh);
     return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("storage", onFocus);
+      window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("speedyprint:data-updated", onRefresh);
     };
   }, []);
 

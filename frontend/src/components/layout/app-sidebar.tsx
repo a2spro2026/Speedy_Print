@@ -65,14 +65,8 @@ const groups: NavGroup[] = [
     accent: "from-violet-500 to-purple-600",
     children: [
       { label: "Fiche Fournisseur", href: "/dashboard/fournisseurs/fiches", icon: Building2 },
-      {
-        label: "Facture Achat",
-        icon: Receipt,
-        children: [
-          { label: "Facture Achat", href: "/dashboard/fournisseurs/factures", icon: Receipt },
-          { label: "Bon de Commande", href: "/dashboard/fournisseurs/bon-commande", icon: ClipboardList },
-        ],
-      },
+      { label: "Bon de Commande", href: "/dashboard/fournisseurs/bon-commande", icon: ClipboardList },
+      { label: "Facture Achat", href: "/dashboard/fournisseurs/factures", icon: Receipt },
       { label: "Règlement", href: "/dashboard/fournisseurs/reglements", icon: Wallet },
       { label: "Balance", href: "/dashboard/fournisseurs/balance", icon: Scale },
     ],

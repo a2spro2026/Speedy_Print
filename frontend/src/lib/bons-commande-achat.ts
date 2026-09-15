@@ -3,6 +3,7 @@ import {
   normalizeTypeReglement,
   type TypeReglement,
 } from "@/lib/fournisseurs";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 import {
   calcSousTotal,
   emptyLigne,
@@ -134,9 +135,7 @@ export function totalBonCommande(lignes: LigneBonCommandeAchat[]): number {
 export function loadBonsCommandeAchat(): BonCommandeAchat[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as BonCommandeAchat[];
+    const parsed = readJsonStore<BonCommandeAchat[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((b) => ({
       ...b,
@@ -154,5 +153,5 @@ export function loadBonsCommandeAchat(): BonCommandeAchat[] {
 }
 
 export function saveBonsCommandeAchat(list: BonCommandeAchat[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }

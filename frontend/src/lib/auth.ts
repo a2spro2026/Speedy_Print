@@ -1,5 +1,5 @@
 /**
- * Auth adapter — session locale pour la démo.
+ * Auth adapter — session locale.
  * Remplacer facilement par JWT / Supabase Auth.
  */
 
@@ -24,29 +24,28 @@ export type AuthUser = {
 };
 
 const SESSION_KEY = "speedyprint.session";
-const REMEMBER_KEY = "speedyprint.remember";
+
+const VALID_LOGIN = "zerragui";
+const VALID_PASSWORD = "0661755048";
 
 export async function signIn(credentials: AuthCredentials): Promise<AuthResult> {
   await new Promise((resolve) => setTimeout(resolve, 800));
 
-  const email = credentials.email.trim().toLowerCase();
+  const login = credentials.email.trim().toLowerCase();
   const password = credentials.password;
 
-  // Compte démo + accès admin Laravel (mêmes identifiants)
-  const valid =
-    (email === "admin@speedyprint.fr" && password === "password") ||
-    (email === "admin@speedyprint.fr" && password === "admin");
+  const valid = login === VALID_LOGIN && password === VALID_PASSWORD;
 
   if (!valid) {
     return {
       ok: false,
-      message: "Email ou mot de passe incorrect. Essayez admin@speedyprint.fr / password",
+      message: "Identifiant ou mot de passe incorrect.",
     };
   }
 
   const user: AuthUser = {
-    name: "MR KAHLID",
-    email: "admin@speedyprint.fr",
+    name: "Zerragui",
+    email: "zerragui",
     role: "Administrateur",
     avatar: "/avatars/khalid.jpg",
   };
@@ -56,10 +55,8 @@ export async function signIn(credentials: AuthCredentials): Promise<AuthResult> 
   if (typeof window !== "undefined") {
     const payload = JSON.stringify({ token, user });
     if (credentials.remember) {
-      localStorage.setItem(REMEMBER_KEY, credentials.email);
       localStorage.setItem(SESSION_KEY, payload);
     } else {
-      localStorage.removeItem(REMEMBER_KEY);
       sessionStorage.setItem(SESSION_KEY, payload);
       localStorage.removeItem(SESSION_KEY);
     }
@@ -88,8 +85,8 @@ export function getSession(): { token: string; user: AuthUser } | null {
     return {
       token: parsed.token,
       user: {
-        name: parsed.user?.name || "MR KAHLID",
-        email: parsed.user?.email || "admin@speedyprint.fr",
+        name: parsed.user?.name || "Zerragui",
+        email: parsed.user?.email || "zerragui",
         role: parsed.user?.role || "Administrateur",
         avatar: parsed.user?.avatar || "/avatars/khalid.jpg",
       },

@@ -11,6 +11,7 @@ import {
 } from "@/lib/balance-fournisseur";
 import { formatDateFR } from "@/lib/fournisseurs";
 import { formatMoney, moneyTone } from "@/lib/money";
+import { refreshBusinessStore } from "@/lib/business-store";
 
 function printBalanceRows(
   rows: LigneBalanceFournisseur[],
@@ -73,12 +74,14 @@ export default function BalanceFournisseurPage() {
 
   useEffect(() => {
     refresh();
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("storage", onFocus);
+    const onRefresh = () => {
+      void refreshBusinessStore().then(refresh);
+    };
+    window.addEventListener("focus", onRefresh);
+    window.addEventListener("speedyprint:data-updated", onRefresh);
     return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("storage", onFocus);
+      window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("speedyprint:data-updated", onRefresh);
     };
   }, []);
 

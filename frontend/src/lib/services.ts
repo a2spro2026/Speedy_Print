@@ -1,3 +1,5 @@
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
+
 export type Service = {
   ref: string; // Srv0001
   designation: string;
@@ -26,9 +28,7 @@ export function nextServiceRef(existing: Service[]): string {
 export function loadServices(): Service[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Array<Partial<Service>>;
+    const parsed = readJsonStore<Array<Partial<Service>>>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed
       .map((s) => ({
@@ -45,5 +45,5 @@ export function loadServices(): Service[] {
 }
 
 export function saveServices(list: Service[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }

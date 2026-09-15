@@ -9,14 +9,22 @@ import {
   Eye,
   FileDown,
   FileText,
+  Import,
   Pencil,
   Plus,
   Printer,
   Trash2,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  CatalogSuggestInput,
+  buildCatalogSuggestItems,
+  type CatalogSuggestItem,
+} from "@/components/ui/catalog-suggest-input";
+import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
@@ -29,6 +37,10 @@ import {
 import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
 import {
+  loadDevis,
+  type Devis,
+} from "@/lib/devis";
+import {
   downloadFactureVente,
   printFactureVente,
 } from "@/lib/print-facture-vente";
@@ -39,7 +51,9 @@ import {
   UNITES,
   calcSousTotal,
   emptyLigne,
+  factureFromDevis,
   formatDateFR,
+  isDevisConverted,
   loadFacturesVente,
   moisFromDate,
   moisLabel,
@@ -183,10 +197,32 @@ export default function FactureVentePage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [produits, setProduits] = useState<Produit[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [devisList, setDevisList] = useState<Devis[]>([]);
   const [mode, setMode] = useState<FormMode | null>(null);
   const [ready, setReady] = useState(false);
   const [printTarget, setPrintTarget] = useState<FactureVente | null>(null);
+  const [importPanelOpen, setImportPanelOpen] = useState(false);
+  const [pendingDevisId, setPendingDevisId] = useState<string | null>(null);
   const moisOpts = useMemo(() => moisOptions(), []);
+  const catalogItems = useMemo(
+    () => buildCatalogSuggestItems(produits, services),
+    [produits, services]
+  );
+
+  const devisImportables = useMemo(
+    () =>
+      [...devisList]
+        .filter(
+          (d) =>
+            !isDevisConverted(d.id, list) &&
+            d.id !== pendingDevisId
+        )
+        .sort((a, b) => {
+          if (a.date === b.date) return b.id.localeCompare(a.id);
+          return b.date.localeCompare(a.date);
+        }),
+    [devisList, list, pendingDevisId]
+  );
 
   const {
     register,
@@ -217,6 +253,7 @@ export default function FactureVentePage() {
 
   const { fields, append, remove } = useFieldArray({ control, name: "lignes" });
   const watchDate = useWatch({ control, name: "date" });
+  const watchEcheance = useWatch({ control, name: "echeance" });
   const watchType = useWatch({ control, name: "typeFacture" });
   const watchLignes = useWatch({ control, name: "lignes" });
   const watchClientId = useWatch({ control, name: "clientId" });
@@ -231,10 +268,25 @@ export default function FactureVentePage() {
     setList(loaded);
     saveFacturesVente(loaded);
     setClients(loadClients());
+    setDevisList(loadDevis());
     const cat = refreshCatalog();
     setProduits(cat.produits);
     setServices(cat.services);
     setReady(true);
+
+    const onFocus = () => {
+      const c = refreshCatalog();
+      setProduits(c.produits);
+      setServices(c.services);
+      setDevisList(loadDevis());
+      setList(loadFacturesVente());
+    };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("speedyprint:data-updated", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("speedyprint:data-updated", onFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -294,21 +346,51 @@ export default function FactureVentePage() {
       echeance: d,
       lignes: [ligneToForm(emptyLigne())],
     });
+    setPendingDevisId(null);
+    setImportPanelOpen(false);
+    setDevisList(loadDevis());
     setMode("create");
   }
 
   function openView(f: FactureVente) {
     reset(toFormValues(f));
+    setPendingDevisId(f.devisId ?? null);
+    setImportPanelOpen(false);
     setMode("view");
   }
 
   function openEdit(f: FactureVente) {
     reset(toFormValues(f));
+    setPendingDevisId(f.devisId ?? null);
+    setImportPanelOpen(false);
     setMode("edit");
   }
 
   function closeForm() {
     setMode(null);
+    setPendingDevisId(null);
+    setImportPanelOpen(false);
+  }
+
+  function openImportPanel() {
+    setDevisList(loadDevis());
+    setList(loadFacturesVente());
+    setImportPanelOpen(true);
+  }
+
+  function importFromDevis(d: Devis) {
+    if (mode !== "create") return;
+    const draft = factureFromDevis(d, list);
+    const currentId = getValues("id");
+    const currentNumero = getValues("numeroFacture");
+    reset({
+      ...toFormValues(draft),
+      id: currentId || draft.id,
+      numeroFacture: currentNumero || draft.numeroFacture,
+    });
+    setPendingDevisId(d.id);
+    setImportPanelOpen(false);
+    toast.success(`Devis « ${d.numeroDevis} » importé.`);
   }
 
   function onClientChange(id: string) {
@@ -318,41 +400,19 @@ export default function FactureVentePage() {
     setValue("ice", f?.ice ?? "");
   }
 
-  function applyCatalogMatch(index: number, value: string) {
-    const name = value.trim().toLowerCase();
-    if (!name) {
-      setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-      return;
-    }
-    const s = services.find((x) => x.designation.trim().toLowerCase() === name);
-    if (s) {
-      setValue(`lignes.${index}.kind`, "service", { shouldValidate: true });
-      setValue(`lignes.${index}.ref`, s.ref, { shouldValidate: true });
-      setValue(`lignes.${index}.unite`, s.unite || "U", { shouldValidate: true });
-      setValue(`lignes.${index}.prixU`, toMoneyInput(s.prixVente), {
-        shouldValidate: true,
-      });
-      return;
-    }
-    const p = produits.find((x) => x.designation.trim().toLowerCase() === name);
-    if (p) {
-      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-      setValue(`lignes.${index}.ref`, p.ref, { shouldValidate: true });
-      setValue(`lignes.${index}.unite`, "U", { shouldValidate: true });
-      setValue(`lignes.${index}.prixU`, toMoneyInput(p.prixVente), {
-        shouldValidate: true,
-      });
-      return;
-    }
-    setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-    setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-  }
-
-  function onDesignationInput(index: number, value: string) {
+  function applyCatalogItem(index: number, item: CatalogSuggestItem) {
     if (readOnly) return;
-    setValue(`lignes.${index}.designation`, value, { shouldValidate: true });
-    applyCatalogMatch(index, value);
+    setValue(`lignes.${index}.kind`, item.kind, { shouldValidate: true });
+    setValue(`lignes.${index}.ref`, item.ref, { shouldValidate: true });
+    setValue(`lignes.${index}.designation`, item.designation, {
+      shouldValidate: true,
+    });
+    setValue(`lignes.${index}.unite`, item.unite || "U", {
+      shouldValidate: true,
+    });
+    setValue(`lignes.${index}.prixU`, toMoneyInput(item.prixVente), {
+      shouldValidate: true,
+    });
   }
 
   function onDelete(f: FactureVente) {
@@ -438,7 +498,7 @@ export default function FactureVentePage() {
       echeance: values.echeance,
       lignes,
       montantFacture: totalFacture(lignes),
-      devisId: list.find((x) => x.id === values.id)?.devisId,
+      devisId: pendingDevisId || list.find((x) => x.id === values.id)?.devisId,
     };
 
     if (mode === "create") {
@@ -446,6 +506,8 @@ export default function FactureVentePage() {
       setList(next);
       saveFacturesVente(next);
       syncClientSoldeOnFactureCreate(row);
+      setPendingDevisId(null);
+      setImportPanelOpen(false);
       toast.success("Facture enregistrée.");
       setMode(null);
       return;
@@ -494,6 +556,29 @@ export default function FactureVentePage() {
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-white to-slate-50/40 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.25)]"
         >
           <div className="sticky top-0 z-20 shrink-0 border-b border-slate-200/80 bg-white/95 p-3 backdrop-blur-sm md:p-4">
+          {mode === "create" && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-muted">
+                {pendingDevisId ? (
+                  <span className="font-medium text-brand">
+                    Devis importé — il n&apos;apparaît plus dans la liste
+                    d&apos;import.
+                  </span>
+                ) : (
+                  "Vous pouvez importer un devis existant."
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openImportPanel}
+              >
+                <Import className="h-4 w-4" />
+                Importer
+              </Button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-x-3 gap-y-3">
             <div className="min-w-[150px] flex-1">
               <Field label="Mois" error={errors.mois?.message}>
@@ -512,9 +597,9 @@ export default function FactureVentePage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Date" error={errors.date?.message}>
-                <Input
-                  {...register("date")}
-                  type="date"
+                <DateFrInput
+                  value={watchDate}
+                  onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />
@@ -623,9 +708,9 @@ export default function FactureVentePage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Échéance" error={errors.echeance?.message}>
-                <Input
-                  {...register("echeance")}
-                  type="date"
+                <DateFrInput
+                  value={watchEcheance}
+                  onChange={(iso) => setValue("echeance", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />
@@ -688,37 +773,36 @@ export default function FactureVentePage() {
                       className="border-t border-slate-100 bg-white hover:bg-blue-50/30"
                     >
                       <td className="p-1.5 align-middle">
-                        <Input
-                          {...register(`lignes.${index}.ref`)}
-                          readOnly
-                          className={`${inputReadonly} text-center`}
-                          placeholder="—"
+                        <CatalogSuggestInput
+                          mode="ref"
+                          value={watchLignes?.[index]?.ref ?? ""}
+                          items={catalogItems}
+                          readOnly={readOnly}
+                          placeholder="Réf"
+                          className={`${readOnly ? inputReadonly : inputSheet} text-center`}
+                          onChange={(v) =>
+                            setValue(`lignes.${index}.ref`, v, {
+                              shouldValidate: true,
+                            })
+                          }
+                          onSelect={(item) => applyCatalogItem(index, item)}
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <Input
-                          list={`fv-designation-${index}`}
-                          {...register(`lignes.${index}.designation`, {
-                            onChange: (e) =>
-                              onDesignationInput(index, e.target.value),
-                          })}
+                        <CatalogSuggestInput
+                          mode="designation"
+                          value={watchLignes?.[index]?.designation ?? ""}
+                          items={catalogItems}
                           readOnly={readOnly}
-                          placeholder="Saisir la désignation…"
+                          placeholder="Désignation"
                           className={`${readOnly ? inputReadonly : inputSheet} w-full text-left`}
-                          autoComplete="off"
+                          onChange={(v) =>
+                            setValue(`lignes.${index}.designation`, v, {
+                              shouldValidate: true,
+                            })
+                          }
+                          onSelect={(item) => applyCatalogItem(index, item)}
                         />
-                        <datalist id={`fv-designation-${index}`}>
-                          {produits.map((item) => (
-                            <option key={item.ref} value={item.designation}>
-                              Produit
-                            </option>
-                          ))}
-                          {services.map((item) => (
-                            <option key={item.ref} value={item.designation}>
-                              Service
-                            </option>
-                          ))}
-                        </datalist>
                         <input
                           type="hidden"
                           {...register(`lignes.${index}.kind`)}
@@ -979,6 +1063,105 @@ export default function FactureVentePage() {
       </div>
       )}
     </div>
+
+      {importPanelOpen && mode === "create" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="import-devis-title"
+          onClick={() => setImportPanelOpen(false)}
+        >
+          <div
+            className="flex max-h-[min(80dvh,640px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                  <Import className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2
+                    id="import-devis-title"
+                    className="text-base font-bold text-ink"
+                  >
+                    Importer un devis
+                  </h2>
+                  <p className="text-xs text-muted">
+                    Sélectionnez un devis — il disparaîtra de cette liste.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Fermer"
+                onClick={() => setImportPanelOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto">
+              <table className="w-full min-w-[640px] border-collapse text-center text-sm">
+                <thead className="sticky top-0 bg-slate-900 text-white">
+                  <tr>
+                    <th className="px-3 py-3 text-[12px] font-bold">Date</th>
+                    <th className="px-3 py-3 text-[12px] font-bold">N° Devis</th>
+                    <th className="px-3 py-3 text-[12px] font-bold">Client</th>
+                    <th className="px-3 py-3 text-[12px] font-bold">Total</th>
+                    <th className="px-3 py-3 text-[12px] font-bold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devisImportables.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-12 text-center text-sm text-muted"
+                      >
+                        Aucun devis disponible à importer.
+                      </td>
+                    </tr>
+                  ) : (
+                    devisImportables.map((d, i) => (
+                      <tr
+                        key={d.id}
+                        className={`border-t border-slate-100 ${
+                          i % 2 === 0 ? "bg-white" : "bg-slate-50/60"
+                        }`}
+                      >
+                        <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                          {formatDateFR(d.date)}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold">
+                          {d.numeroDevis}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-ink">
+                          {d.nomClient}
+                        </td>
+                        <td className={`px-3 py-2.5 ${moneyTone.facture}`}>
+                          {formatMoney(d.montantFacture)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => importFromDevis(d)}
+                          >
+                            Sélectionner
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {printTarget && (
         <div

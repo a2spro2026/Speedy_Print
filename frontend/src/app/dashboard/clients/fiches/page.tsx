@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Eye, Pencil, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, toMoneyInput } from "@/lib/money";
@@ -14,7 +15,6 @@ import {
   TYPES_REGLEMENT,
   formatDateFR,
   loadClients,
-  nextClientId,
   saveClients,
   todayISO,
   type Client,
@@ -48,7 +48,7 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
-type FormMode = "create" | "edit" | "view";
+type FormMode = "edit" | "view";
 
 const selectClass =
   "flex h-10 w-full rounded-lg border-0 border-b-2 border-slate-200 bg-slate-50/80 px-3 py-2 text-center text-sm font-medium text-ink transition-all duration-200 hover:bg-slate-50 focus-visible:border-brand focus-visible:bg-white focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-60";
@@ -137,6 +137,8 @@ export default function FicheClientPage() {
     handleSubmit,
     reset,
     getValues,
+    setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -154,6 +156,8 @@ export default function FicheClientPage() {
       soldeInitial: "0.00",
     },
   });
+
+  const watchDate = useWatch({ control, name: "date" });
 
   useEffect(() => {
     setList(loadClients());
@@ -182,23 +186,6 @@ export default function FicheClientPage() {
   }, [sorted, dateFrom, dateTo, searchClient]);
 
   const readOnly = mode === "view";
-
-  function openNouveau() {
-    reset({
-      date: todayISO(),
-      id: nextClientId(list),
-      nom: "",
-      contact: "",
-      ville: "",
-      typeReglement: "Vir",
-      banque: "",
-      rc: "",
-      ice: "",
-      rib: "",
-      soldeInitial: "0.00",
-    });
-    setMode("create");
-  }
 
   function openView(f: Client) {
     reset(toFormValues(f));
@@ -229,59 +216,31 @@ export default function FicheClientPage() {
   }
 
   function onSubmit(values: FormValues) {
-    if (mode === "view") return;
+    if (mode !== "edit") return;
 
-    if (mode === "create") {
-      if (list.some((f) => f.id === values.id)) {
-        toast.error("Cet ID client existe déjà.");
-        return;
-      }
-      const row: Client = {
-        id: values.id,
-        date: values.date,
-        nom: values.nom.trim(),
-        contact: (values.contact ?? "").trim(),
-        ville: (values.ville ?? "").trim(),
-        typeReglement: values.typeReglement as TypeReglement,
-        banque: (values.banque ?? "").trim(),
-        rc: (values.rc ?? "").trim(),
-        ice: (values.ice ?? "").trim(),
-        rib: (values.rib ?? "").trim(),
-        soldeInitial: parseMoney(values.soldeInitial),
-      };
-      const next = [row, ...list];
-      setList(next);
-      saveClients(next);
-      toast.success("Client enregistré.");
-      setMode(null);
+    const prev = list.find((f) => f.id === values.id);
+    if (!prev) {
+      toast.error("Client introuvable.");
       return;
     }
-
-    if (mode === "edit") {
-      const prev = list.find((f) => f.id === values.id);
-      if (!prev) {
-        toast.error("Client introuvable.");
-        return;
-      }
-      const row: Client = {
-        ...prev,
-        date: values.date,
-        nom: values.nom.trim(),
-        contact: (values.contact ?? "").trim(),
-        ville: (values.ville ?? "").trim(),
-        typeReglement: values.typeReglement as TypeReglement,
-        banque: (values.banque ?? "").trim(),
-        rc: (values.rc ?? "").trim(),
-        ice: (values.ice ?? "").trim(),
-        rib: (values.rib ?? "").trim(),
-        soldeInitial: parseMoney(values.soldeInitial),
-      };
-      const next = list.map((f) => (f.id === row.id ? row : f));
-      setList(next);
-      saveClients(next);
-      toast.success("Client modifié.");
-      setMode(null);
-    }
+    const row: Client = {
+      ...prev,
+      date: values.date,
+      nom: values.nom.trim(),
+      contact: (values.contact ?? "").trim(),
+      ville: (values.ville ?? "").trim(),
+      typeReglement: values.typeReglement as TypeReglement,
+      banque: (values.banque ?? "").trim(),
+      rc: (values.rc ?? "").trim(),
+      ice: (values.ice ?? "").trim(),
+      rib: (values.rib ?? "").trim(),
+      soldeInitial: parseMoney(values.soldeInitial),
+    };
+    const next = list.map((f) => (f.id === row.id ? row : f));
+    setList(next);
+    saveClients(next);
+    toast.success("Client modifié.");
+    setMode(null);
   }
 
   if (!ready) {
@@ -294,15 +253,6 @@ export default function FicheClientPage() {
 
   return (
     <div className="space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
-      {!mode && (
-        <div className="flex justify-end">
-          <Button type="button" onClick={openNouveau}>
-            <Plus className="h-4 w-4" />
-            Nouveau Client
-          </Button>
-        </div>
-      )}
-
       {mode && (
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -311,9 +261,9 @@ export default function FicheClientPage() {
           <div className="flex flex-wrap gap-x-3 gap-y-3">
             <div className="min-w-[128px] flex-[0.55]">
               <Field label="Date" error={errors.date?.message}>
-                <Input
-                  {...register("date")}
-                  type="date"
+                <DateFrInput
+                  value={watchDate}
+                  onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
                   readOnly
                   className={`${inputReadonly} px-1.5 text-[13px]`}
                 />
@@ -451,20 +401,18 @@ export default function FicheClientPage() {
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/70 bg-white p-3 shadow-sm md:p-4">
         <div className="min-w-[140px] flex-[0.8]">
           <Field label="Date de">
-            <Input
-              type="date"
+            <DateFrInput
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={setDateFrom}
               className={`${inputShell} px-1.5 text-[13px]`}
             />
           </Field>
         </div>
         <div className="min-w-[140px] flex-[0.8]">
           <Field label="Date à">
-            <Input
-              type="date"
+            <DateFrInput
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={setDateTo}
               className={`${inputShell} px-1.5 text-[13px]`}
             />
           </Field>
@@ -523,11 +471,9 @@ export default function FicheClientPage() {
                   >
                     {sorted.length === 0 ? (
                       <>
-                        Aucun client. Cliquez sur{" "}
-                        <span className="font-semibold text-ink">
-                          Nouveau Client
-                        </span>
-                        .
+                        Aucun client. Les fiches sont créées automatiquement
+                        depuis un{" "}
+                        <span className="font-semibold text-ink">Devis</span>.
                       </>
                     ) : (
                       "Aucun résultat pour ces critères."

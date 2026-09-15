@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, FileDown, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
@@ -191,6 +192,8 @@ export default function ReglementClientPage() {
     },
   });
 
+  const watchDate = useWatch({ control, name: "date" });
+  const watchDateEncaisse = useWatch({ control, name: "dateEncaisse" });
   const watchFactureId = useWatch({ control, name: "factureId" });
   const watchMontantFacture = useWatch({ control, name: "montantFacture" });
   const watchMontantPaye = useWatch({ control, name: "montantPaye" });
@@ -420,9 +423,9 @@ export default function ReglementClientPage() {
           <div className="flex flex-wrap gap-x-3 gap-y-3">
             <div className="min-w-[128px] flex-[0.55]">
               <Field label="Date" error={errors.date?.message}>
-                <Input
-                  {...register("date")}
-                  type="date"
+                <DateFrInput
+                  value={watchDate}
+                  onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} px-1.5 text-[13px]`}
                 />
@@ -541,9 +544,9 @@ export default function ReglementClientPage() {
 
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Date Encaiss" error={errors.dateEncaisse?.message}>
-                <Input
-                  {...register("dateEncaisse")}
-                  type="date"
+                <DateFrInput
+                  value={watchDateEncaisse}
+                  onChange={(iso) => setValue("dateEncaisse", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />

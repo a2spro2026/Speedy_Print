@@ -1,4 +1,5 @@
 import { TYPES_REGLEMENT, normalizeTypeReglement, type TypeReglement } from "@/lib/fournisseurs";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 
 export type TypeFacture = "Exonéré" | "HT" | "TTC";
 export type BaseFacture = "Achat" | "Avoir";
@@ -147,9 +148,7 @@ export function emptyLigne(): LigneFactureAchat {
 export function loadFacturesAchat(): FactureAchat[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as FactureAchat[];
+    const parsed = readJsonStore<FactureAchat[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((f) => ({
       ...f,
@@ -163,7 +162,7 @@ export function loadFacturesAchat(): FactureAchat[] {
 }
 
 export function saveFacturesAchat(list: FactureAchat[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }
 
 /** Qté achetée d'un produit (réf) depuis les factures d'achat. Avoir = négatif. */

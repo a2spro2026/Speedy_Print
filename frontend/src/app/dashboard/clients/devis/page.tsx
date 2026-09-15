@@ -8,10 +8,21 @@ import { Eye, ArrowRightLeft, FileText, Pencil, Plus, Printer, Trash2 } from "lu
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  CatalogSuggestInput,
+  buildCatalogSuggestItems,
+  type CatalogSuggestItem,
+} from "@/components/ui/catalog-suggest-input";
+import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
-import { loadClients, type Client } from "@/lib/clients";
+import {
+  loadClients,
+  normalizeNomClient,
+  upsertClientFromDocument,
+  type Client,
+} from "@/lib/clients";
 import {
   ensureCatalogItem,
   inferCatalogKind,
@@ -49,7 +60,7 @@ import {
 } from "@/lib/devis";
 
 const ligneSchema = z.object({
-  kind: z.enum(["produit", "service"]),
+  kind: z.enum(["produit", "service"]).optional(),
   ref: z.string().optional(),
   designation: z.string().min(1, "Désignation obligatoire"),
   qte: z.string().min(1),
@@ -67,8 +78,8 @@ const schema = z.object({
   base: z.enum(["Devis"]),
   numeroDevis: z.string().min(1, "N° devis obligatoire"),
   id: z.string(), // interne DV-
-  clientId: z.string().min(1, "Client obligatoire"),
-  nomClient: z.string().min(1),
+  clientId: z.string().optional(),
+  nomClient: z.string().min(1, "Nom client obligatoire"),
   ice: z.string().optional(),
   typeReglement: z.enum([
     "Esp",
@@ -97,8 +108,6 @@ const inputReadonly =
 /** Cellules tableau désignations */
 const inputSheet =
   "h-9 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm shadow-none focus-visible:ring-1 focus-visible:ring-brand/30";
-const selectSheet =
-  "flex h-9 w-full rounded-lg border border-slate-200 bg-white px-1.5 text-center text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/30 disabled:opacity-60";
 
 function num(v: string): number {
   const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
@@ -107,7 +116,7 @@ function num(v: string): number {
 
 function ligneToForm(l: ReturnType<typeof emptyLigne>) {
   return {
-    kind: inferCatalogKind(l.ref) as CatalogKind,
+    kind: (inferCatalogKind(l.ref) as CatalogKind) || "produit",
     ref: l.ref,
     designation: l.designation,
     qte: String(l.qte),
@@ -116,17 +125,6 @@ function ligneToForm(l: ReturnType<typeof emptyLigne>) {
     remise: toMoneyInput(l.remise),
     tva: toMoneyInput(l.tva),
     sousTotal: toMoneyInput(l.sousTotal),
-  };
-}
-
-function refreshCatalog() {
-  return {
-    produits: [...loadProduits()].sort((a, b) =>
-      a.designation.localeCompare(b.designation, "fr")
-    ),
-    services: [...loadServices()].sort((a, b) =>
-      a.designation.localeCompare(b.designation, "fr")
-    ),
   };
 }
 
@@ -164,6 +162,10 @@ export default function DevisPage() {
   const [ready, setReady] = useState(false);
   const [printTarget, setPrintTarget] = useState<Devis | null>(null);
   const moisOpts = useMemo(() => moisOptions(), []);
+  const catalogItems = useMemo(
+    () => buildCatalogSuggestItems(produits, services),
+    [produits, services]
+  );
 
   const {
     register,
@@ -193,9 +195,9 @@ export default function DevisPage() {
 
   const { fields, append, remove } = useFieldArray({ control, name: "lignes" });
   const watchDate = useWatch({ control, name: "date" });
+  const watchEcheance = useWatch({ control, name: "echeance" });
   const watchType = useWatch({ control, name: "typeFacture" });
   const watchLignes = useWatch({ control, name: "lignes" });
-  const watchClientId = useWatch({ control, name: "clientId" });
 
   const montantTotal = useMemo(() => {
     if (!watchLignes?.length) return 0;
@@ -207,10 +209,20 @@ export default function DevisPage() {
     setList(devis);
     saveDevis(devis);
     setClients(loadClients());
-    const cat = refreshCatalog();
-    setProduits(cat.produits);
-    setServices(cat.services);
+    setProduits(loadProduits());
+    setServices(loadServices());
     setReady(true);
+
+    const onFocus = () => {
+      setProduits(loadProduits());
+      setServices(loadServices());
+    };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("speedyprint:data-updated", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("speedyprint:data-updated", onFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -283,48 +295,33 @@ export default function DevisPage() {
     setMode(null);
   }
 
-  function onClientChange(id: string) {
-    const f = clients.find((x) => x.id === id);
-    setValue("clientId", id, { shouldValidate: true });
-    setValue("nomClient", f?.nom ?? "", { shouldValidate: true });
-    setValue("ice", f?.ice ?? "");
-  }
-
-  function applyCatalogMatch(index: number, value: string) {
-    const name = value.trim().toLowerCase();
-    if (!name) {
-      setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-      return;
-    }
-    const s = services.find((x) => x.designation.trim().toLowerCase() === name);
-    if (s) {
-      setValue(`lignes.${index}.kind`, "service", { shouldValidate: true });
-      setValue(`lignes.${index}.ref`, s.ref, { shouldValidate: true });
-      setValue(`lignes.${index}.unite`, s.unite || "U", { shouldValidate: true });
-      setValue(`lignes.${index}.prixU`, toMoneyInput(s.prixVente), {
-        shouldValidate: true,
-      });
-      return;
-    }
-    const p = produits.find((x) => x.designation.trim().toLowerCase() === name);
-    if (p) {
-      setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-      setValue(`lignes.${index}.ref`, p.ref, { shouldValidate: true });
-      setValue(`lignes.${index}.unite`, "U", { shouldValidate: true });
-      setValue(`lignes.${index}.prixU`, toMoneyInput(p.prixVente), {
-        shouldValidate: true,
-      });
-      return;
-    }
-    setValue(`lignes.${index}.kind`, "produit", { shouldValidate: true });
-    setValue(`lignes.${index}.ref`, "", { shouldValidate: true });
-  }
-
-  function onDesignationInput(index: number, value: string) {
+  function linkClientByNom(nomSaisi: string) {
     if (readOnly) return;
-    setValue(`lignes.${index}.designation`, value, { shouldValidate: true });
-    applyCatalogMatch(index, value);
+    const key = normalizeNomClient(nomSaisi);
+    if (!key) return;
+    const match = clients.find((c) => normalizeNomClient(c.nom) === key);
+    if (!match) return;
+    setValue("clientId", match.id, { shouldValidate: true });
+    setValue("nomClient", match.nom, { shouldValidate: true });
+    if (match.ice) setValue("ice", match.ice);
+    if (match.typeReglement) {
+      setValue("typeReglement", match.typeReglement);
+    }
+  }
+
+  function applyCatalogItem(index: number, item: CatalogSuggestItem) {
+    if (readOnly) return;
+    setValue(`lignes.${index}.kind`, item.kind, { shouldValidate: true });
+    setValue(`lignes.${index}.ref`, item.ref, { shouldValidate: true });
+    setValue(`lignes.${index}.designation`, item.designation, {
+      shouldValidate: true,
+    });
+    setValue(`lignes.${index}.unite`, item.unite || "U", {
+      shouldValidate: true,
+    });
+    setValue(`lignes.${index}.prixU`, toMoneyInput(item.prixVente), {
+      shouldValidate: true,
+    });
   }
 
   function onDelete(f: Devis) {
@@ -376,15 +373,16 @@ export default function DevisPage() {
         tva,
         typeFacture: type,
       });
+      const kind = (l.kind || "produit") as CatalogKind;
       const ensured = ensureCatalogItem({
-        kind: l.kind,
+        kind,
         designation: l.designation,
         prixU,
         unite: l.unite,
         ref: l.ref,
       });
       return {
-        ref: ensured.ref,
+        ref: ensured.ref || (l.ref ?? "").trim(),
         designation: l.designation.trim(),
         qte,
         unite: l.unite,
@@ -395,9 +393,18 @@ export default function DevisPage() {
       };
     });
 
-    const cat = refreshCatalog();
-    setProduits(cat.produits);
-    setServices(cat.services);
+    // Rafraîchir catalogue (réfs auto)
+    setProduits(loadProduits());
+    setServices(loadServices());
+
+    const client = upsertClientFromDocument({
+      clientId: values.clientId,
+      nom: values.nomClient,
+      ice: values.ice,
+      typeReglement: values.typeReglement as TypeReglement,
+      date: values.date,
+    });
+    setClients(loadClients());
 
     const row: Devis = {
       id: values.id || nextDevisId(list),
@@ -405,10 +412,12 @@ export default function DevisPage() {
       date: values.date,
       typeFacture: type,
       base: values.base,
-      numeroDevis: normalizeNumeroDevis(values.numeroDevis.trim() || nextNumeroDevis(list)),
-      clientId: values.clientId,
-      nomClient: values.nomClient.trim(),
-      ice: (values.ice ?? "").trim(),
+      numeroDevis: normalizeNumeroDevis(
+        values.numeroDevis.trim() || nextNumeroDevis(list)
+      ),
+      clientId: client.id,
+      nomClient: client.nom,
+      ice: client.ice,
       typeReglement: values.typeReglement as TypeReglement,
       echeance: values.echeance,
       lignes,
@@ -476,9 +485,9 @@ export default function DevisPage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Date" error={errors.date?.message}>
-                <Input
-                  {...register("date")}
-                  type="date"
+                <DateFrInput
+                  value={watchDate}
+                  onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
                 />
@@ -510,24 +519,19 @@ export default function DevisPage() {
                 label="Nom Client"
                 error={errors.nomClient?.message}
               >
-                <select
-                  className={selectClass}
-                  disabled={readOnly}
-                  value={watchClientId || ""}
-                  onChange={(e) => onClientChange(e.target.value)}
-                >
-                  <option value="">— Sélectionner —</option>
-                  {clients.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.nom}
-                    </option>
+                <Input
+                  {...register("nomClient")}
+                  placeholder="Nom du client"
+                  readOnly={readOnly}
+                  className={readOnly ? inputReadonly : inputShell}
+                  list="clients-existants-dv"
+                  onBlur={(e) => linkClientByNom(e.target.value)}
+                />
+                <datalist id="clients-existants-dv">
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.nom} />
                   ))}
-                </select>
-                {clients.length === 0 && (
-                  <p className="text-[11px] text-amber-700">
-                    Créez d&apos;abord une fiche client.
-                  </p>
-                )}
+                </datalist>
               </Field>
             </div>
             <div className="min-w-[140px] flex-1">
@@ -547,21 +551,29 @@ export default function DevisPage() {
             </div>
             <div className="min-w-[165px] flex-[0.9]">
               <Field label="Échéance" error={errors.echeance?.message}>
-                <Input
-                  {...register("echeance")}
-                  type="date"
+                <DateFrInput
+                  value={watchEcheance}
+                  onChange={(iso) => setValue("echeance", iso, { shouldValidate: true })}
                   readOnly={readOnly}
                   className={`${readOnly ? inputReadonly : inputShell} min-w-[150px] px-2.5 text-[13px]`}
+                />
+              </Field>
+            </div>
+            <div className="min-w-[130px] flex-1">
+              <Field label="ICE" error={errors.ice?.message}>
+                <Input
+                  {...register("ice")}
+                  placeholder="ICE"
+                  readOnly={readOnly}
+                  className={`${readOnly ? inputReadonly : inputShell} font-mono text-[13px]`}
                 />
               </Field>
             </div>
           </div>
 
           <input type="hidden" {...register("id")} />
-          <input type="hidden" {...register("nomClient")} />
           <input type="hidden" {...register("typeFacture")} />
           <input type="hidden" {...register("base")} />
-          <input type="hidden" {...register("ice")} />
 
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
@@ -606,37 +618,36 @@ export default function DevisPage() {
                       className="border-t border-slate-100 bg-white hover:bg-blue-50/30"
                     >
                       <td className="p-1.5 align-middle">
-                        <Input
-                          {...register(`lignes.${index}.ref`)}
-                          readOnly
-                          className={`${inputReadonly} text-center`}
-                          placeholder="—"
+                        <CatalogSuggestInput
+                          mode="ref"
+                          value={watchLignes?.[index]?.ref ?? ""}
+                          items={catalogItems}
+                          readOnly={readOnly}
+                          placeholder="Réf"
+                          className={`${readOnly ? inputReadonly : inputSheet} text-center`}
+                          onChange={(v) =>
+                            setValue(`lignes.${index}.ref`, v, {
+                              shouldValidate: true,
+                            })
+                          }
+                          onSelect={(item) => applyCatalogItem(index, item)}
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <Input
-                          list={`dv-designation-${index}`}
-                          {...register(`lignes.${index}.designation`, {
-                            onChange: (e) =>
-                              onDesignationInput(index, e.target.value),
-                          })}
+                        <CatalogSuggestInput
+                          mode="designation"
+                          value={watchLignes?.[index]?.designation ?? ""}
+                          items={catalogItems}
                           readOnly={readOnly}
-                          placeholder="Saisir la désignation…"
+                          placeholder="Désignation"
                           className={`${readOnly ? inputReadonly : inputSheet} w-full text-left`}
-                          autoComplete="off"
+                          onChange={(v) =>
+                            setValue(`lignes.${index}.designation`, v, {
+                              shouldValidate: true,
+                            })
+                          }
+                          onSelect={(item) => applyCatalogItem(index, item)}
                         />
-                        <datalist id={`dv-designation-${index}`}>
-                          {produits.map((item) => (
-                            <option key={item.ref} value={item.designation}>
-                              Produit
-                            </option>
-                          ))}
-                          {services.map((item) => (
-                            <option key={item.ref} value={item.designation}>
-                              Service
-                            </option>
-                          ))}
-                        </datalist>
                         <input
                           type="hidden"
                           {...register(`lignes.${index}.kind`)}
@@ -656,17 +667,18 @@ export default function DevisPage() {
                         />
                       </td>
                       <td className="p-1.5 align-middle">
-                        <select
+                        <Input
                           {...register(`lignes.${index}.unite`)}
-                          className={`${selectSheet} text-center`}
-                          disabled={readOnly}
-                        >
+                          readOnly={readOnly}
+                          className={`${readOnly ? inputReadonly : inputSheet} text-center`}
+                          placeholder="U"
+                          list={`unites-dv-${index}`}
+                        />
+                        <datalist id={`unites-dv-${index}`}>
                           {UNITES.map((u) => (
-                            <option key={u} value={u}>
-                              {u}
-                            </option>
+                            <option key={u} value={u} />
                           ))}
-                        </select>
+                        </datalist>
                       </td>
                       <td className="p-1.5 align-middle">
                         <Input

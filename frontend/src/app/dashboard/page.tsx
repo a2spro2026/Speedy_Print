@@ -39,7 +39,7 @@ const stats: StatCard[] = [
     iconBg: "bg-white/20",
   },
   {
-    label: "Total Ventes",
+    label: "Total Services",
     value: formatMoney(0),
     icon: TrendingUp,
     gradient: "from-[#059669] via-[#10B981] to-[#34D399]",

@@ -3,6 +3,7 @@ import {
   normalizeTypeReglement,
   type TypeReglement,
 } from "@/lib/fournisseurs";
+import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 
 export type ReglementFournisseur = {
   id: string; // REG-xxxx
@@ -69,9 +70,7 @@ type Legacy = Partial<ReglementFournisseur> & {
 export function loadReglements(): ReglementFournisseur[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Legacy[];
+    const parsed = readJsonStore<Legacy[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((r) => {
       const montantFacture = Number(r.montantFacture) || 0;
@@ -107,5 +106,5 @@ export function loadReglements(): ReglementFournisseur[] {
 }
 
 export function saveReglements(list: ReglementFournisseur[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  writeJsonStore(STORAGE_KEY, list);
 }
