@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, FileDown, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { CircleDollarSign, Eye, FileDown, Pencil, Plus, Printer, Scale, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ReglementStatCard,
+  summarizeReglements,
+} from "@/components/dashboard/reglement-summary-cards";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
 import { loadFacturesAchat, type FactureAchat } from "@/lib/factures-achat";
 import {
@@ -238,6 +242,8 @@ export default function ReglementFournisseurPage() {
     [list]
   );
 
+  const cards = useMemo(() => summarizeReglements(list), [list]);
+
   const readOnly = mode === "view";
   const pieceDisabled =
     readOnly ||
@@ -365,11 +371,36 @@ export default function ReglementFournisseurPage() {
   return (
     <div className="space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
       {!mode && (
-        <div className="flex justify-end">
-          <Button type="button" onClick={openNouveau}>
-            <Plus className="h-4 w-4" />
-            Nouveau Règlement
-          </Button>
+        <div className="flex flex-wrap items-stretch justify-between gap-3">
+          <div className="flex min-w-0 flex-[3] flex-wrap gap-3">
+            <ReglementStatCard
+              label="Montant Total"
+              value={cards.total}
+              hint="Total factures liées"
+              icon={CircleDollarSign}
+              gradient="from-[#2563EB] via-[#3B82F6] to-[#60A5FA]"
+            />
+            <ReglementStatCard
+              label="Montant Payé"
+              value={cards.paye}
+              hint="Somme des règlements"
+              icon={Wallet}
+              gradient="from-[#059669] via-[#10B981] to-[#34D399]"
+            />
+            <ReglementStatCard
+              label="Solde"
+              value={cards.solde}
+              hint="Total − Payé"
+              icon={Scale}
+              gradient="from-[#D97706] via-[#F59E0B] to-[#FBBF24]"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="button" onClick={openNouveau}>
+              <Plus className="h-4 w-4" />
+              Nouveau Règlement
+            </Button>
+          </div>
         </div>
       )}
 
