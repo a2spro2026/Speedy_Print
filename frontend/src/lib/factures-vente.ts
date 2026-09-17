@@ -302,18 +302,25 @@ export function loadFacturesVente(): FactureVente[] {
   try {
     const parsed = readJsonStore<FactureVente[]>(STORAGE_KEY, []);
     if (!Array.isArray(parsed)) return [];
-    return migrateFactureNumeros(
-      parsed.map((f) => ({
-        ...f,
-        bonCmdNumero: normalizeBonCmdNumero(f.bonCmdNumero ?? ""),
-        typeReglement: normalizeTypeReglement(f.typeReglement),
-        lignes:
-          Array.isArray(f.lignes) && f.lignes.length > 0
-            ? f.lignes
-            : [emptyLigne()],
-        montantFacture: Number(f.montantFacture) || 0,
-      }))
+    const normalized = parsed.map((f) => ({
+      ...f,
+      bonCmdNumero: normalizeBonCmdNumero(f.bonCmdNumero ?? ""),
+      typeReglement: normalizeTypeReglement(f.typeReglement),
+      lignes:
+        Array.isArray(f.lignes) && f.lignes.length > 0
+          ? f.lignes
+          : [emptyLigne()],
+      montantFacture: Number(f.montantFacture) || 0,
+    }));
+    const migrated = migrateFactureNumeros(normalized);
+    const changed = migrated.some(
+      (f, i) =>
+        f.numeroFacture !== normalized[i]?.numeroFacture ||
+        f.bonCmdNumero !== normalized[i]?.bonCmdNumero ||
+        f.typeReglement !== normalized[i]?.typeReglement
     );
+    if (changed) writeJsonStore(STORAGE_KEY, migrated);
+    return migrated;
   } catch {
     return [];
   }

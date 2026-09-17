@@ -29,6 +29,7 @@ import { DateFrInput } from "@/components/ui/date-fr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney, moneyTone, toMoneyInput } from "@/lib/money";
+import { refreshBusinessStore } from "@/lib/business-store";
 import { loadClients, type Client } from "@/lib/clients";
 import {
   ensureCatalogItem,
@@ -265,28 +266,41 @@ export default function FactureVentePage() {
   }, [watchLignes]);
 
   useEffect(() => {
-    const loaded = loadFacturesVente();
-    setList(loaded);
-    saveFacturesVente(loaded);
-    setClients(loadClients());
-    setDevisList(loadDevis());
-    const cat = refreshCatalog();
-    setProduits(cat.produits);
-    setServices(cat.services);
-    setReady(true);
+    let cancelled = false;
 
-    const onFocus = () => {
+    async function boot() {
+      await refreshBusinessStore();
+      if (cancelled) return;
+      setList(loadFacturesVente());
+      setClients(loadClients());
+      setDevisList(loadDevis());
+      const cat = refreshCatalog();
+      setProduits(cat.produits);
+      setServices(cat.services);
+      setReady(true);
+    }
+
+    void boot();
+
+    const reloadLocal = () => {
+      if (cancelled) return;
       const c = refreshCatalog();
       setProduits(c.produits);
       setServices(c.services);
       setDevisList(loadDevis());
       setList(loadFacturesVente());
     };
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("speedyprint:data-updated", onFocus);
+
+    const onWindowFocus = () => {
+      void refreshBusinessStore().then(reloadLocal);
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    window.addEventListener("speedyprint:data-updated", reloadLocal);
     return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("speedyprint:data-updated", onFocus);
+      cancelled = true;
+      window.removeEventListener("focus", onWindowFocus);
+      window.removeEventListener("speedyprint:data-updated", reloadLocal);
     };
   }, []);
 

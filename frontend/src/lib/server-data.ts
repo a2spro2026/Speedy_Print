@@ -58,8 +58,19 @@ export async function writeStorePatch(
 ): Promise<void> {
   await ensureDataDir();
   for (const [key, value] of Object.entries(patch)) {
-    if (isBusinessStorageKey(key)) {
-      await writeStoreKey(key, value);
+    if (!isBusinessStorageKey(key)) continue;
+
+    // Ne jamais écraser une liste non vide par [] (course locale / onglet stale).
+    if (Array.isArray(value) && value.length === 0) {
+      const prev = await readStoreKey(key);
+      if (Array.isArray(prev) && prev.length > 0) {
+        console.warn(
+          `[server-data] ignore empty overwrite for ${key} (kept ${prev.length} items)`
+        );
+        continue;
+      }
     }
+
+    await writeStoreKey(key, value);
   }
 }

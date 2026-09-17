@@ -207,7 +207,6 @@ export default function DevisPage() {
   useEffect(() => {
     const devis = loadDevis();
     setList(devis);
-    saveDevis(devis);
     setClients(loadClients());
     setProduits(loadProduits());
     setServices(loadServices());

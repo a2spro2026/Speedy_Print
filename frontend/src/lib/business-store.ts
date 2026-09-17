@@ -133,6 +133,18 @@ export function readJsonStore<T>(key: string, fallback: T): T {
 export function writeJsonStore<T>(key: string, value: T): void {
   if (typeof window === "undefined") return;
 
+  // Garde-fou local : ne pas pousser [] si on avait déjà des données.
+  if (Array.isArray(value) && value.length === 0) {
+    const prev =
+      key in cache ? cache[key] : readLocalStorage(key);
+    if (Array.isArray(prev) && prev.length > 0) {
+      console.warn(
+        `[business-store] refuse empty overwrite for ${key} (kept ${prev.length} items)`
+      );
+      return;
+    }
+  }
+
   cache[key] = value;
   writeLocalStorage(key, value);
 
