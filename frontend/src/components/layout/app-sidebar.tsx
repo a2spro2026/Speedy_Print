@@ -131,9 +131,14 @@ type AppSidebarProps = {
   onLogout: () => void;
 };
 
+const ALWAYS_OPEN_GROUPS = new Set(["fournisseurs", "clients"]);
+
 export function AppSidebar({ onLogout }: AppSidebarProps) {
   const pathname = usePathname();
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const [openGroups, setOpenGroups] = useState<string[]>([
+    "fournisseurs",
+    "clients",
+  ]);
   const [openSubmenus, setOpenSubmenus] = useState<string[]>([]);
 
   useEffect(() => {
@@ -162,6 +167,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   }, [pathname]);
 
   const toggleGroup = (id: string) => {
+    if (ALWAYS_OPEN_GROUPS.has(id)) return;
     setOpenGroups((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -221,7 +227,8 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
         </div>
 
         {groups.map((group) => {
-          const open = openGroups.includes(group.id);
+          const pinnedOpen = ALWAYS_OPEN_GROUPS.has(group.id);
+          const open = pinnedOpen || openGroups.includes(group.id);
           const childActive = group.children.some((child) =>
             itemHrefs(child).some((href) => pathname.startsWith(href))
           );
@@ -231,7 +238,9 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
               key={group.id}
               className={cn(
                 "rounded-2xl transition",
-                open || childActive ? "bg-white/[0.04] ring-1 ring-white/10" : ""
+                open || childActive
+                  ? "bg-white/[0.045] ring-1 ring-white/[0.08]"
+                  : ""
               )}
             >
               <button
@@ -241,9 +250,11 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                   "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition",
                   childActive || open
                     ? "text-white"
-                    : "text-white/75 hover:bg-white/5 hover:text-white"
+                    : "text-white/75 hover:bg-white/5 hover:text-white",
+                  pinnedOpen && "cursor-default"
                 )}
                 aria-expanded={open}
+                aria-disabled={pinnedOpen || undefined}
               >
                 <span
                   className={cn(
@@ -254,24 +265,26 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                   <group.icon className="h-4 w-4" />
                 </span>
                 <span className="flex-1">{group.label}</span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 text-white/50 transition-transform duration-300",
-                    open && "rotate-180"
-                  )}
-                />
+                {!pinnedOpen && (
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-white/50 transition-transform duration-300",
+                      open && "rotate-180"
+                    )}
+                  />
+                )}
               </button>
 
               <AnimatePresence initial={false}>
                 {open && (
                   <motion.div
-                    initial={{ height: 0, opacity: 0 }}
+                    initial={pinnedOpen ? false : { height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.22 }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-1 px-2 pb-2 pt-1">
+                    <div className="relative mx-3 mb-2.5 ml-[2.15rem] space-y-0.5 border-l border-white/10 pl-3">
                       {group.children.map((child) => {
                         if (isNavGroup(child)) {
                           const subOpen = openSubmenus.includes(child.label);
@@ -284,18 +297,29 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                                 type="button"
                                 onClick={() => toggleSubmenu(child.label)}
                                 className={cn(
-                                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition",
+                                  "group/sub flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition",
                                   subActive || subOpen
                                     ? "bg-white/10 text-white"
-                                    : "text-white/65 hover:bg-white/8 hover:text-white"
+                                    : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                                 )}
                                 aria-expanded={subOpen}
                               >
-                                <child.icon className="h-3.5 w-3.5 opacity-70" />
-                                <span className="flex-1 text-left">{child.label}</span>
+                                <span
+                                  className={cn(
+                                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition",
+                                    subActive || subOpen
+                                      ? "bg-white/15 text-white"
+                                      : "bg-white/[0.06] text-white/45 group-hover/sub:text-white/70"
+                                  )}
+                                >
+                                  <child.icon className="h-3 w-3" />
+                                </span>
+                                <span className="flex-1 text-left">
+                                  {child.label}
+                                </span>
                                 <ChevronDown
                                   className={cn(
-                                    "h-3.5 w-3.5 text-white/50 transition-transform duration-300",
+                                    "h-3.5 w-3.5 text-white/40 transition-transform duration-300",
                                     subOpen && "rotate-180"
                                   )}
                                 />
@@ -309,27 +333,38 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                                     transition={{ duration: 0.18 }}
                                     className="overflow-hidden"
                                   >
-                                    <div className="ml-3 space-y-0.5 border-l border-white/10 pl-2">
+                                    <div className="ml-2 space-y-0.5 border-l border-white/10 pl-2">
                                       {child.children.map((sub) => {
-                                        const active = pathname.startsWith(sub.href);
+                                        const active = pathname.startsWith(
+                                          sub.href
+                                        );
                                         return (
                                           <Link
                                             key={sub.href}
                                             href={sub.href}
                                             className={cn(
-                                              "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] font-medium transition",
+                                              "group/link relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium transition",
                                               active
-                                                ? "bg-white text-slate-900 shadow-md shadow-black/20"
-                                                : "text-white/60 hover:bg-white/8 hover:text-white"
+                                                ? "bg-white text-slate-900 shadow-[0_4px_14px_rgba(0,0,0,0.25)]"
+                                                : "text-white/55 hover:bg-white/[0.06] hover:text-white"
                                             )}
                                           >
-                                            <sub.icon
+                                            <span
                                               className={cn(
-                                                "h-3 w-3",
-                                                active ? "text-brand" : "opacity-70"
+                                                "flex h-5 w-5 shrink-0 items-center justify-center rounded-md",
+                                                active
+                                                  ? "bg-brand/15 text-brand"
+                                                  : "bg-white/[0.05] text-white/40 group-hover/link:text-white/70"
                                               )}
-                                            />
-                                            {sub.label}
+                                            >
+                                              <sub.icon className="h-2.5 w-2.5" />
+                                            </span>
+                                            <span className="truncate">
+                                              {sub.label}
+                                            </span>
+                                            {active && (
+                                              <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                                            )}
                                           </Link>
                                         );
                                       })}
@@ -347,19 +382,26 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                             key={child.href}
                             href={child.href}
                             className={cn(
-                              "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition",
+                              "group/link relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition",
                               active
-                                ? "bg-white text-slate-900 shadow-md shadow-black/20"
-                                : "text-white/65 hover:bg-white/8 hover:text-white"
+                                ? "bg-white text-slate-900 shadow-[0_4px_14px_rgba(0,0,0,0.25)]"
+                                : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                             )}
                           >
-                            <child.icon
+                            <span
                               className={cn(
-                                "h-3.5 w-3.5",
-                                active ? "text-brand" : "opacity-70"
+                                "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition",
+                                active
+                                  ? "bg-brand/15 text-brand"
+                                  : "bg-white/[0.06] text-white/45 group-hover/link:bg-white/10 group-hover/link:text-white/75"
                               )}
-                            />
-                            {child.label}
+                            >
+                              <child.icon className="h-3 w-3" />
+                            </span>
+                            <span className="truncate">{child.label}</span>
+                            {active && (
+                              <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                            )}
                           </Link>
                         );
                       })}
