@@ -112,7 +112,7 @@ function InvoiceTable({
           {title}
         </h2>
       </div>
-      <div className="overflow-x-auto">
+      <div className="table-scroll">
         <table className="w-full min-w-[520px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">

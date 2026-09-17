@@ -326,6 +326,28 @@ export default function FactureVentePage() {
     [list]
   );
 
+  const [filterMois, setFilterMois] = useState("");
+  const [filterId, setFilterId] = useState("");
+  const [filterNom, setFilterNom] = useState("");
+
+  const filtered = useMemo(() => {
+    const idQ = filterId.trim().toLowerCase();
+    const nomQ = filterNom.trim().toLowerCase();
+    return sorted.filter((f) => {
+      if (filterMois && f.mois !== filterMois) return false;
+      if (
+        idQ &&
+        !f.clientId.toLowerCase().includes(idQ) &&
+        !f.id.toLowerCase().includes(idQ) &&
+        !f.numeroFacture.toLowerCase().includes(idQ)
+      ) {
+        return false;
+      }
+      if (nomQ && !f.nomClient.toLowerCase().includes(nomQ)) return false;
+      return true;
+    });
+  }, [sorted, filterMois, filterId, filterNom]);
+
   const readOnly = mode === "view";
 
   function openNouveau() {
@@ -542,12 +564,66 @@ export default function FactureVentePage() {
       }
     >
       {!mode && (
+        <>
         <div className="flex justify-end">
           <Button type="button" onClick={openNouveau}>
             <Plus className="h-4 w-4" />
             Nouvelle Facture
           </Button>
         </div>
+
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/70 bg-white p-3 shadow-sm md:p-4">
+          <div className="min-w-[160px] flex-1">
+            <Field label="Mois">
+              <select
+                className={selectClass}
+                value={filterMois}
+                onChange={(e) => setFilterMois(e.target.value)}
+              >
+                <option value="">— Tous —</option>
+                {moisOpts.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="min-w-[140px] flex-1">
+            <Field label="ID">
+              <Input
+                value={filterId}
+                onChange={(e) => setFilterId(e.target.value)}
+                placeholder="ID client / N°…"
+                className={inputShell}
+              />
+            </Field>
+          </div>
+          <div className="min-w-[200px] flex-[1.6]">
+            <Field label="Nom Client">
+              <Input
+                value={filterNom}
+                onChange={(e) => setFilterNom(e.target.value)}
+                placeholder="Nom client…"
+                className={inputShell}
+              />
+            </Field>
+          </div>
+          {(filterMois || filterId || filterNom) && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setFilterMois("");
+                setFilterId("");
+                setFilterNom("");
+              }}
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </div>
+        </>
       )}
 
       {mode && (
@@ -943,7 +1019,7 @@ export default function FactureVentePage() {
 
       {!mode && (
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full min-w-[1100px] border-collapse text-center text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -962,21 +1038,27 @@ export default function FactureVentePage() {
               </tr>
             </thead>
             <tbody>
-              {sorted.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td
                     colSpan={12}
                     className="px-4 py-14 text-center text-sm text-muted"
                   >
-                    Aucune facture. Cliquez sur{" "}
-                    <span className="font-semibold text-ink">
-                      Nouvelle Facture
-                    </span>
-                    .
+                    {sorted.length === 0 ? (
+                      <>
+                        Aucune facture. Cliquez sur{" "}
+                        <span className="font-semibold text-ink">
+                          Nouvelle Facture
+                        </span>
+                        .
+                      </>
+                    ) : (
+                      "Aucun résultat pour ces critères."
+                    )}
                   </td>
                 </tr>
               ) : (
-                sorted.map((f, i) => (
+                filtered.map((f, i) => (
                   <tr
                     key={f.id}
                     className={`border-t border-slate-100 hover:bg-blue-50/50 ${

@@ -53,3 +53,18 @@
   padding-bottom: 0;
   margin-top: 0;
 }
+
+/* Tableaux : en-têtes figés, seules les lignes défilent */
+.table-scroll {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: #0f172a;
+  background-image: linear-gradient(to right, #0f172a, #1e293b, #0f172a);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.35);
+}

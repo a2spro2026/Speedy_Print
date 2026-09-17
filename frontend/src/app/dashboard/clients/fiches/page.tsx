@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, Pencil, Printer, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DateFrInput } from "@/components/ui/date-fr-input";
@@ -15,6 +15,8 @@ import {
   TYPES_REGLEMENT,
   formatDateFR,
   loadClients,
+  nextClientId,
+  normalizeNomClient,
   saveClients,
   todayISO,
   type Client,
@@ -48,7 +50,7 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
-type FormMode = "edit" | "view";
+type FormMode = "create" | "edit" | "view";
 
 const selectClass =
   "flex h-10 w-full rounded-lg border-0 border-b-2 border-slate-200 bg-slate-50/80 px-3 py-2 text-center text-sm font-medium text-ink transition-all duration-200 hover:bg-slate-50 focus-visible:border-brand focus-visible:bg-white focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-60";
@@ -144,7 +146,7 @@ export default function FicheClientPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       date: todayISO(),
-      id: "FRN-0001",
+      id: "CLI-0001",
       nom: "",
       contact: "",
       ville: "",
@@ -187,6 +189,23 @@ export default function FicheClientPage() {
 
   const readOnly = mode === "view";
 
+  function openNouveau() {
+    reset({
+      date: todayISO(),
+      id: nextClientId(list),
+      nom: "",
+      contact: "",
+      ville: "",
+      typeReglement: "Vir",
+      banque: "",
+      rc: "",
+      ice: "",
+      rib: "",
+      soldeInitial: "0.00",
+    });
+    setMode("create");
+  }
+
   function openView(f: Client) {
     reset(toFormValues(f));
     setMode("view");
@@ -216,31 +235,74 @@ export default function FicheClientPage() {
   }
 
   function onSubmit(values: FormValues) {
-    if (mode !== "edit") return;
+    if (mode === "view") return;
 
-    const prev = list.find((f) => f.id === values.id);
-    if (!prev) {
-      toast.error("Client introuvable.");
+    const nom = values.nom.trim().replace(/\s+/g, " ");
+    const nomKey = normalizeNomClient(nom);
+
+    if (mode === "create") {
+      if (list.some((f) => f.id === values.id)) {
+        toast.error("Cet ID client existe déjà.");
+        return;
+      }
+      if (list.some((f) => normalizeNomClient(f.nom) === nomKey)) {
+        toast.error("Ce nom client existe déjà.");
+        return;
+      }
+      const row: Client = {
+        id: values.id,
+        date: values.date,
+        nom,
+        contact: (values.contact ?? "").trim(),
+        ville: (values.ville ?? "").trim(),
+        typeReglement: values.typeReglement as TypeReglement,
+        banque: (values.banque ?? "").trim(),
+        rc: (values.rc ?? "").trim(),
+        ice: (values.ice ?? "").trim(),
+        rib: (values.rib ?? "").trim(),
+        soldeInitial: parseMoney(values.soldeInitial),
+      };
+      const next = [row, ...list];
+      setList(next);
+      saveClients(next);
+      toast.success("Client enregistré.");
+      setMode(null);
       return;
     }
-    const row: Client = {
-      ...prev,
-      date: values.date,
-      nom: values.nom.trim(),
-      contact: (values.contact ?? "").trim(),
-      ville: (values.ville ?? "").trim(),
-      typeReglement: values.typeReglement as TypeReglement,
-      banque: (values.banque ?? "").trim(),
-      rc: (values.rc ?? "").trim(),
-      ice: (values.ice ?? "").trim(),
-      rib: (values.rib ?? "").trim(),
-      soldeInitial: parseMoney(values.soldeInitial),
-    };
-    const next = list.map((f) => (f.id === row.id ? row : f));
-    setList(next);
-    saveClients(next);
-    toast.success("Client modifié.");
-    setMode(null);
+
+    if (mode === "edit") {
+      const prev = list.find((f) => f.id === values.id);
+      if (!prev) {
+        toast.error("Client introuvable.");
+        return;
+      }
+      if (
+        list.some(
+          (f) => f.id !== values.id && normalizeNomClient(f.nom) === nomKey
+        )
+      ) {
+        toast.error("Ce nom client existe déjà.");
+        return;
+      }
+      const row: Client = {
+        ...prev,
+        date: values.date,
+        nom,
+        contact: (values.contact ?? "").trim(),
+        ville: (values.ville ?? "").trim(),
+        typeReglement: values.typeReglement as TypeReglement,
+        banque: (values.banque ?? "").trim(),
+        rc: (values.rc ?? "").trim(),
+        ice: (values.ice ?? "").trim(),
+        rib: (values.rib ?? "").trim(),
+        soldeInitial: parseMoney(values.soldeInitial),
+      };
+      const next = list.map((f) => (f.id === row.id ? row : f));
+      setList(next);
+      saveClients(next);
+      toast.success("Client modifié.");
+      setMode(null);
+    }
   }
 
   if (!ready) {
@@ -253,6 +315,15 @@ export default function FicheClientPage() {
 
   return (
     <div className="space-y-2 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
+      {!mode && (
+        <div className="flex justify-end">
+          <Button type="button" onClick={openNouveau}>
+            <Plus className="h-4 w-4" />
+            Nouveau Client
+          </Button>
+        </div>
+      )}
+
       {mode && (
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -264,8 +335,8 @@ export default function FicheClientPage() {
                 <DateFrInput
                   value={watchDate}
                   onChange={(iso) => setValue("date", iso, { shouldValidate: true })}
-                  readOnly
-                  className={`${inputReadonly} px-1.5 text-[13px]`}
+                  readOnly={readOnly}
+                  className={`${readOnly ? inputReadonly : inputShell} px-1.5 text-[13px]`}
                 />
               </Field>
             </div>
@@ -443,7 +514,7 @@ export default function FicheClientPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full min-w-[1040px] border-collapse text-center text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -471,9 +542,11 @@ export default function FicheClientPage() {
                   >
                     {sorted.length === 0 ? (
                       <>
-                        Aucun client. Les fiches sont créées automatiquement
-                        depuis un{" "}
-                        <span className="font-semibold text-ink">Devis</span>.
+                        Aucun client. Cliquez sur{" "}
+                        <span className="font-semibold text-ink">
+                          Nouveau Client
+                        </span>{" "}
+                        ou créez un devis.
                       </>
                     ) : (
                       "Aucun résultat pour ces critères."

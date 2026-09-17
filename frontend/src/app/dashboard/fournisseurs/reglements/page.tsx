@@ -552,7 +552,7 @@ export default function ReglementFournisseurPage() {
 
       {!mode && (
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full min-w-[1100px] border-collapse text-center text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">

@@ -50,7 +50,7 @@ export default function EtatServicePage() {
   return (
     <div className="space-y-3 px-4 pb-4 pt-1 md:px-6 md:pb-6 md:pt-2">
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full min-w-[720px] border-collapse text-center text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
