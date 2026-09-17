@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  Receipt,
   Trash2,
   Wallet,
   X,
@@ -348,6 +349,15 @@ export default function FactureVentePage() {
     });
   }, [sorted, filterMois, filterId, filterNom]);
 
+  const montantTotalListe = useMemo(
+    () =>
+      filtered.reduce((s, f) => {
+        const m = Number(f.montantFacture) || 0;
+        return s + (f.base === "Avoir" ? -m : m);
+      }, 0),
+    [filtered]
+  );
+
   const readOnly = mode === "view";
 
   function openNouveau() {
@@ -565,7 +575,25 @@ export default function FactureVentePage() {
     >
       {!mode && (
         <>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="stat-card-fixed relative min-w-[220px] flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-[#2563EB] via-[#3B82F6] to-[#60A5FA] px-4 py-3.5 text-white shadow-md sm:max-w-[320px]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">
+                  Montant Total
+                </p>
+                <p className="mt-1 text-xl font-extrabold tabular-nums tracking-tight">
+                  {formatMoney(montantTotalListe)}
+                </p>
+                <p className="mt-0.5 text-[11px] font-medium text-white/75">
+                  Total des factures de vente
+                </p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                <Receipt className="h-5 w-5" />
+              </span>
+            </div>
+          </div>
           <Button type="button" onClick={openNouveau}>
             <Plus className="h-4 w-4" />
             Nouvelle Facture
