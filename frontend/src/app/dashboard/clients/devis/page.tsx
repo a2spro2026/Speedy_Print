@@ -32,11 +32,12 @@ import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
 import { printDevis } from "@/lib/print-devis";
 import {
+  factureForDevis,
   factureFromDevis,
-  isDevisConverted,
   loadFacturesVente,
   saveFacturesVente,
   syncClientSoldeOnFactureCreate,
+  type FactureVente,
 } from "@/lib/factures-vente";
 import {
   TYPES_REGLEMENT,
@@ -155,6 +156,7 @@ function onPrintDevis(d: Devis, withLetterhead: boolean) {
 export default function DevisPage() {
   const router = useRouter();
   const [list, setList] = useState<Devis[]>([]);
+  const [factures, setFactures] = useState<FactureVente[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [produits, setProduits] = useState<Produit[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -207,12 +209,14 @@ export default function DevisPage() {
   useEffect(() => {
     const devis = loadDevis();
     setList(devis);
+    setFactures(loadFacturesVente());
     setClients(loadClients());
     setProduits(loadProduits());
     setServices(loadServices());
     setReady(true);
 
     const onFocus = () => {
+      setFactures(loadFacturesVente());
       setProduits(loadProduits());
       setServices(loadServices());
     };
@@ -341,9 +345,12 @@ export default function DevisPage() {
   }
 
   function onConvert(d: Devis) {
-    const factures = loadFacturesVente();
-    if (isDevisConverted(d.id, factures)) {
-      toast.error(`Le devis « ${d.numeroDevis} » est déjà converti en facture.`);
+    const current = loadFacturesVente();
+    const existing = factureForDevis(d.id, current);
+    if (existing) {
+      toast.error(
+        `Le devis « ${d.numeroDevis} » est déjà facturé (« ${existing.numeroFacture} »).`
+      );
       return;
     }
     const ok = window.confirm(
@@ -351,9 +358,10 @@ export default function DevisPage() {
     );
     if (!ok) return;
 
-    const facture = factureFromDevis(d, factures);
-    const next = [facture, ...factures];
+    const facture = factureFromDevis(d, current);
+    const next = [facture, ...current];
     saveFacturesVente(next);
+    setFactures(next);
     syncClientSoldeOnFactureCreate(facture);
     toast.success(
       `Devis converti en facture « ${facture.numeroFacture} ».`
@@ -805,6 +813,7 @@ export default function DevisPage() {
                 <th className="px-3 py-3.5 text-[12px] font-bold">Montant</th>
                 <th className="px-3 py-3.5 text-[12px] font-bold">Règlement</th>
                 <th className="px-3 py-3.5 text-[12px] font-bold">Échéance</th>
+                <th className="px-3 py-3.5 text-[12px] font-bold">Statut</th>
                 <th className="px-3 py-3.5 text-[12px] font-bold">Actions</th>
               </tr>
             </thead>
@@ -812,7 +821,7 @@ export default function DevisPage() {
               {sorted.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-4 py-14 text-center text-sm text-muted"
                   >
                     Aucun devis. Cliquez sur{" "}
@@ -823,7 +832,9 @@ export default function DevisPage() {
                   </td>
                 </tr>
               ) : (
-                sorted.map((f, i) => (
+                sorted.map((f, i) => {
+                  const facture = factureForDevis(f.id, factures);
+                  return (
                   <tr
                     key={f.id}
                     className={`border-t border-slate-100 hover:bg-blue-50/50 ${
@@ -850,6 +861,17 @@ export default function DevisPage() {
                     <td className="px-3 py-3 tabular-nums">
                       {formatDateFR(f.echeance)}
                     </td>
+                    <td className="px-3 py-3">
+                      {facture ? (
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                          Facturé · {facture.numeroFacture}
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                          À facturer
+                        </span>
+                      )}
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex items-center justify-center gap-1 rounded-xl bg-slate-100/80 p-1">
                         <ActionBtn
@@ -874,8 +896,9 @@ export default function DevisPage() {
                           <Printer className="h-4 w-4" />
                         </ActionBtn>
                         <ActionBtn
-                          label="Convertir"
+                          label="Convertir en facture"
                           onClick={() => onConvert(f)}
+                          disabled={!!facture}
                           className="text-emerald-700 hover:bg-white"
                         >
                           <ArrowRightLeft className="h-4 w-4" />
@@ -890,7 +913,8 @@ export default function DevisPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -993,11 +1017,13 @@ function ActionBtn({
   label,
   onClick,
   className,
+  disabled,
   children,
 }: {
   label: string;
   onClick: () => void;
   className?: string;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -1006,7 +1032,8 @@ function ActionBtn({
       title={label}
       aria-label={label}
       onClick={onClick}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${className ?? ""}`}
+      disabled={disabled}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${className ?? ""}`}
     >
       {children}
     </button>

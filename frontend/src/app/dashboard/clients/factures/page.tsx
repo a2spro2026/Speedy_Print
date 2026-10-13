@@ -54,6 +54,7 @@ import {
   UNITES,
   calcSousTotal,
   emptyLigne,
+  compareFacturesParNumero,
   factureFromBons,
   factureFromDevis,
   formatDateFR,
@@ -360,11 +361,7 @@ export default function FactureVentePage() {
   }, [watchLignes, watchType, mode, setValue]);
 
   const sorted = useMemo(
-    () =>
-      [...list].sort((a, b) => {
-        if (a.date === b.date) return b.id.localeCompare(a.id);
-        return b.date.localeCompare(a.date);
-      }),
+    () => [...list].sort(compareFacturesParNumero),
     [list]
   );
 

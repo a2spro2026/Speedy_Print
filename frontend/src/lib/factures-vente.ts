@@ -218,11 +218,47 @@ export function nextNumeroFacture(
   );
 }
 
+export function factureForDevis(
+  devisId: string,
+  existing: FactureVente[]
+): FactureVente | undefined {
+  return existing.find((f) => f.devisId === devisId);
+}
+
 export function isDevisConverted(
   devisId: string,
   existing: FactureVente[]
 ): boolean {
-  return existing.some((f) => f.devisId === devisId);
+  return !!factureForDevis(devisId, existing);
+}
+
+/** Clé de tri : année puis n° (448/2026-FAC → 2026, 448). */
+function numeroSortKey(f: FactureVente): [number, number] {
+  const m = /^(\d+)\/(\d{4})-/.exec((f.numeroFacture || "").trim());
+  if (m) return [Number(m[2]), Number(m[1])];
+  return [Number((f.date || "").slice(0, 4)) || 0, parseFactureNumero(f.numeroFacture) ?? 0];
+}
+
+/** Ordre numérique décroissant des n° facture (le plus récent en haut). */
+export function compareFacturesParNumero(
+  a: FactureVente,
+  b: FactureVente
+): number {
+  const [ya, na] = numeroSortKey(a);
+  const [yb, nb] = numeroSortKey(b);
+  if (ya !== yb) return yb - ya;
+  if (na !== nb) return nb - na;
+  return b.id.localeCompare(a.id);
+}
+
+/** Date de facturation d'un document converti : aujourd'hui, échéance jamais antérieure. */
+function conversionDates(echeanceSource: string) {
+  const date = todayISO();
+  return {
+    date,
+    mois: moisFromDate(date),
+    echeance: echeanceSource && echeanceSource > date ? echeanceSource : date,
+  };
 }
 
 /** Crée une facture vente à partir d'un devis. */
@@ -230,7 +266,8 @@ export function factureFromDevis(
   devis: Devis,
   existing: FactureVente[]
 ): FactureVente {
-  const numeroFacture = nextNumeroFacture(existing, devis.date);
+  const dates = conversionDates(devis.echeance);
+  const numeroFacture = nextNumeroFacture(existing, dates.date);
   const lignes: LigneFactureVente[] = (devis.lignes ?? []).map((l) => ({
     ref: l.ref ?? "",
     designation: l.designation,
@@ -244,8 +281,8 @@ export function factureFromDevis(
 
   return {
     id: nextFactureVenteId(existing),
-    mois: devis.mois,
-    date: devis.date,
+    mois: dates.mois,
+    date: dates.date,
     typeFacture: devis.typeFacture,
     base: "Vente",
     numeroFacture,
@@ -254,7 +291,7 @@ export function factureFromDevis(
     nomClient: devis.nomClient,
     ice: devis.ice ?? "",
     typeReglement: devis.typeReglement,
-    echeance: devis.echeance,
+    echeance: dates.echeance,
     lignes: lignes.length ? lignes : [emptyLigne()],
     montantFacture: devis.montantFacture,
     devisId: devis.id,
@@ -296,19 +333,21 @@ export function factureFromBons(
     }))
   );
 
+  const dates = conversionDates(last.echeance);
+
   return {
     id: nextFactureVenteId(existing),
-    mois: last.mois,
-    date: last.date,
+    mois: dates.mois,
+    date: dates.date,
     typeFacture: last.typeFacture,
     base: "Vente",
-    numeroFacture: nextNumeroFacture(existing, last.date),
+    numeroFacture: nextNumeroFacture(existing, dates.date),
     bonCmdNumero: "BC-",
     clientId: last.clientId,
     nomClient: last.nomClient,
     ice: last.ice ?? "",
     typeReglement: last.typeReglement,
-    echeance: last.echeance,
+    echeance: dates.echeance,
     lignes: lignes.length ? lignes : [emptyLigne()],
     montantFacture: totalFacture(lignes),
     blIds: ordered.map((b) => b.id),
