@@ -18,7 +18,6 @@ import { toast } from "sonner";
 import { isAuthenticated, signIn } from "@/lib/auth";
 import { SpeedyLogo } from "@/components/brand/speedy-logo";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -28,7 +27,6 @@ const loginSchema = z.object({
     .string()
     .min(1, "Le mot de passe est requis.")
     .min(6, "Le mot de passe doit contenir au moins 6 caractères."),
-  remember: z.boolean().optional(),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -36,29 +34,29 @@ type LoginValues = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  // Champs en lecture seule jusqu'au focus : empêche le remplissage auto du navigateur.
+  const [unlocked, setUnlocked] = useState(false);
 
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
       password: "",
-      remember: false,
     },
   });
 
   useEffect(() => {
     if (isAuthenticated()) {
       router.replace("/dashboard");
+      return;
     }
-  }, [router]);
-
-  const remember = watch("remember");
+    reset({ email: "", password: "" });
+  }, [router, reset]);
 
   const onSubmit = async (values: LoginValues) => {
     const result = await signIn(values);
@@ -68,6 +66,7 @@ export function LoginForm() {
       return;
     }
 
+    reset({ email: "", password: "" });
     toast.success("Bienvenue sur SpeedyPrint !");
     router.push("/dashboard");
   };
@@ -118,6 +117,14 @@ export function LoginForm() {
               id="email"
               type="text"
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              readOnly={!unlocked}
+              onFocus={() => setUnlocked(true)}
+              data-lpignore="true"
+              data-1p-ignore
+              data-form-type="other"
               placeholder="Identifiant"
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? "email-error" : undefined}
@@ -142,7 +149,12 @@ export function LoginForm() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              autoComplete="off"
+              autoComplete="new-password"
+              readOnly={!unlocked}
+              onFocus={() => setUnlocked(true)}
+              data-lpignore="true"
+              data-1p-ignore
+              data-form-type="other"
               placeholder="Mot de passe"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? "password-error" : undefined}
@@ -169,19 +181,7 @@ export function LoginForm() {
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="remember"
-              checked={!!remember}
-              onCheckedChange={(checked) =>
-                setValue("remember", checked === true)
-              }
-            />
-            <Label htmlFor="remember" className="cursor-pointer font-normal text-muted">
-              Se souvenir de moi
-            </Label>
-          </div>
+        <div className="flex items-center justify-end gap-3 pt-1">
           <button
             type="button"
             className="text-sm font-semibold text-brand transition hover:text-brand/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded"

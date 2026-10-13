@@ -6,7 +6,6 @@
 export type AuthCredentials = {
   email: string;
   password: string;
-  remember?: boolean;
 };
 
 export type AuthResult = {
@@ -53,13 +52,8 @@ export async function signIn(credentials: AuthCredentials): Promise<AuthResult> 
   const token = `demo.${btoa(user.email)}.${Date.now()}`;
 
   if (typeof window !== "undefined") {
-    const payload = JSON.stringify({ token, user });
-    if (credentials.remember) {
-      localStorage.setItem(SESSION_KEY, payload);
-    } else {
-      sessionStorage.setItem(SESSION_KEY, payload);
-      localStorage.removeItem(SESSION_KEY);
-    }
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, user }));
+    localStorage.removeItem(SESSION_KEY);
   }
 
   return {
@@ -73,8 +67,8 @@ export async function signIn(credentials: AuthCredentials): Promise<AuthResult> 
 export function getSession(): { token: string; user: AuthUser } | null {
   if (typeof window === "undefined") return null;
 
-  const raw =
-    localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  const raw = sessionStorage.getItem(SESSION_KEY);
 
   if (!raw) return null;
 
