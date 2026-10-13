@@ -2,6 +2,7 @@ import { loadClients } from "@/lib/clients";
 import { formatDateFR } from "@/lib/devis";
 import type { BonLivraison } from "@/lib/bons-livraison";
 import { formatMoney } from "@/lib/money";
+import { downloadHtmlAsPdf } from "@/lib/download-pdf";
 import { printHtmlDocument } from "@/lib/print-html";
 
 const ACCENT = "#0F766E";
@@ -287,4 +288,15 @@ export function printBonLivraison(
   options: PrintBonLivraisonOptions = {}
 ): boolean {
   return printHtmlDocument(buildBonLivraisonPrintHtml(b, options));
+}
+
+/** Télécharge le bon de livraison en PDF A4. */
+export function downloadBonLivraison(
+  b: BonLivraison,
+  options: PrintBonLivraisonOptions = {}
+): Promise<boolean> {
+  return downloadHtmlAsPdf(
+    buildBonLivraisonPrintHtml(b, options),
+    b.numeroBL || b.id || "bon-livraison"
+  );
 }

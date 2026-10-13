@@ -1245,7 +1245,7 @@ export default function FactureVentePage() {
                         <ActionBtn
                           label="Télécharger PDF"
                           onClick={() => void onDownloadFacture(f)}
-                          className="text-emerald-700 hover:bg-white"
+                          className="text-cyan-700 hover:bg-white"
                         >
                           <FileDown className="h-4 w-4" />
                         </ActionBtn>

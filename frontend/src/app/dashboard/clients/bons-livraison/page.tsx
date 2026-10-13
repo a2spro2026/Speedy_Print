@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowRightLeft,
   Eye,
+  FileDown,
   FileText,
   PackageCheck,
   Pencil,
@@ -40,7 +41,10 @@ import {
 import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
 import { refreshBusinessStore } from "@/lib/business-store";
-import { printBonLivraison } from "@/lib/print-bon-livraison";
+import {
+  downloadBonLivraison,
+  printBonLivraison,
+} from "@/lib/print-bon-livraison";
 import {
   factureForBl,
   factureFromBons,
@@ -159,6 +163,7 @@ export default function BonsLivraisonPage() {
   const [ready, setReady] = useState(false);
   const [printTarget, setPrintTarget] = useState<BonLivraison | null>(null);
   const [printWithPrices, setPrintWithPrices] = useState(true);
+  const [printAction, setPrintAction] = useState<"print" | "download">("print");
   const moisOpts = useMemo(() => moisOptions(), []);
   const catalogItems = useMemo(
     () => buildCatalogSuggestItems(produits, services),
@@ -469,14 +474,26 @@ export default function BonsLivraisonPage() {
     }
   }
 
-  function doPrint(withLetterhead: boolean) {
+  function openPrintModal(b: BonLivraison, action: "print" | "download") {
+    setPrintWithPrices(true);
+    setPrintAction(action);
+    setPrintTarget(b);
+  }
+
+  async function doPrint(withLetterhead: boolean) {
     if (!printTarget) return;
-    const ok = printBonLivraison(printTarget, {
-      withLetterhead,
-      withPrices: printWithPrices,
-    });
-    if (!ok) toast.error("Impossible de lancer l'impression. Réessayez.");
+    const target = printTarget;
+    const options = { withLetterhead, withPrices: printWithPrices };
     setPrintTarget(null);
+    if (printAction === "download") {
+      toast.message("Préparation du PDF…");
+      const ok = await downloadBonLivraison(target, options);
+      if (ok) toast.success("PDF téléchargé.");
+      else toast.error("Impossible de télécharger le PDF. Réessayez.");
+      return;
+    }
+    const ok = printBonLivraison(target, options);
+    if (!ok) toast.error("Impossible de lancer l'impression. Réessayez.");
   }
 
   if (!ready) {
@@ -915,13 +932,17 @@ export default function BonsLivraisonPage() {
                               </ActionBtn>
                               <ActionBtn
                                 label="Imprimer"
-                                onClick={() => {
-                                  setPrintWithPrices(true);
-                                  setPrintTarget(b);
-                                }}
+                                onClick={() => openPrintModal(b, "print")}
                                 className="text-slate-700 hover:bg-white"
                               >
                                 <Printer className="h-4 w-4" />
+                              </ActionBtn>
+                              <ActionBtn
+                                label="Télécharger PDF"
+                                onClick={() => openPrintModal(b, "download")}
+                                className="text-cyan-700 hover:bg-white"
+                              >
+                                <FileDown className="h-4 w-4" />
                               </ActionBtn>
                               <ActionBtn
                                 label="Convertir en facture"
@@ -966,11 +987,17 @@ export default function BonsLivraisonPage() {
           >
             <div className="mb-1 flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                <Printer className="h-4 w-4" />
+                {printAction === "download" ? (
+                  <FileDown className="h-4 w-4" />
+                ) : (
+                  <Printer className="h-4 w-4" />
+                )}
               </span>
               <div>
                 <h2 id="print-bl-title" className="text-base font-bold text-ink">
-                  Impression bon de livraison
+                  {printAction === "download"
+                    ? "Télécharger le bon de livraison (PDF)"
+                    : "Impression bon de livraison"}
                 </h2>
                 <p className="text-xs text-muted">
                   {printTarget.numeroBL} · {printTarget.nomClient}

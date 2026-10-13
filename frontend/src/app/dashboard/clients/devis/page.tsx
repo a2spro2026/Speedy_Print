@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, ArrowRightLeft, FileText, Pencil, Plus, Printer, Receipt, Trash2 } from "lucide-react";
+import { Eye, ArrowRightLeft, FileDown, FileText, Pencil, Plus, Printer, Receipt, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
 } from "@/lib/ensure-catalog-item";
 import { loadProduits, type Produit } from "@/lib/produits";
 import { loadServices, type Service } from "@/lib/services";
-import { printDevis } from "@/lib/print-devis";
+import { downloadDevis, printDevis } from "@/lib/print-devis";
 import {
   factureForDevis,
   factureFromDevis,
@@ -151,6 +151,16 @@ function onPrintDevis(d: Devis, withLetterhead: boolean) {
   if (!ok) {
     toast.error("Impossible de lancer l'impression. Réessayez.");
   }
+}
+
+async function onDownloadDevis(d: Devis) {
+  toast.message("Préparation du PDF…");
+  const ok = await downloadDevis(d, { withLetterhead: true });
+  if (!ok) {
+    toast.error("Impossible de télécharger le PDF. Réessayez.");
+    return;
+  }
+  toast.success("PDF téléchargé.");
 }
 
 export default function DevisPage() {
@@ -894,6 +904,13 @@ export default function DevisPage() {
                           className="text-slate-700 hover:bg-white"
                         >
                           <Printer className="h-4 w-4" />
+                        </ActionBtn>
+                        <ActionBtn
+                          label="Télécharger PDF"
+                          onClick={() => void onDownloadDevis(f)}
+                          className="text-cyan-700 hover:bg-white"
+                        >
+                          <FileDown className="h-4 w-4" />
                         </ActionBtn>
                         <ActionBtn
                           label="Convertir en facture"

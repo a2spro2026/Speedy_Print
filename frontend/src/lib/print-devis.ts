@@ -1,6 +1,7 @@
 import { loadClients } from "@/lib/clients";
 import { formatDateFR, type Devis } from "@/lib/devis";
 import { formatMoney } from "@/lib/money";
+import { downloadHtmlAsPdf } from "@/lib/download-pdf";
 import { printHtmlDocument } from "@/lib/print-html";
 
 /** Accent devis (totaux) — même famille que facture client. */
@@ -346,4 +347,15 @@ export function printDevis(
   options: PrintDevisOptions = {}
 ): boolean {
   return printHtmlDocument(buildDevisPrintHtml(d, options));
+}
+
+/** Télécharge le devis en PDF A4. */
+export function downloadDevis(
+  d: Devis,
+  options: PrintDevisOptions = {}
+): Promise<boolean> {
+  return downloadHtmlAsPdf(
+    buildDevisPrintHtml(d, options),
+    d.numeroDevis || d.id || "devis"
+  );
 }
