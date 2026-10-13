@@ -8,7 +8,7 @@ import { SpeedyLogo } from "@/components/brand/speedy-logo";
 import { LoginForm } from "@/components/auth/login-form";
 
 export function LoginPage() {
-  const [panelVisible, setPanelVisible] = useState(true);
+  const [panelVisible, setPanelVisible] = useState(false);
 
   return (
     <div className="relative min-h-dvh w-full overflow-hidden bg-[#0c1b3a]">
