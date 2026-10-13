@@ -50,7 +50,8 @@ export function LoginPage() {
       <button
         type="button"
         onClick={() => setPanelVisible((v) => !v)}
-        className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:right-6 sm:top-6"
+        title={panelVisible ? "Masquer le panneau" : "Afficher le panneau"}
+        className="group absolute right-4 top-4 z-20 flex h-12 w-12 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:right-6 sm:top-6"
         aria-label={
           panelVisible
             ? "Masquer le panneau de connexion"
@@ -58,14 +59,21 @@ export function LoginPage() {
         }
         aria-pressed={!panelVisible}
       >
-        {panelVisible ? (
-          <EyeOff className="h-4 w-4" />
-        ) : (
-          <Eye className="h-4 w-4" />
-        )}
-        <span className="hidden sm:inline">
-          {panelVisible ? "Masquer" : "Se connecter"}
+        <span
+          className="absolute inset-0 animate-pulse rounded-full bg-gradient-to-tr from-[#38bdf8] via-[#f472b6] to-[#fbbf24] opacity-70 blur-md transition group-hover:opacity-100"
+          aria-hidden
+        />
+        <span
+          className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#38bdf8] via-[#f472b6] to-[#fbbf24] p-[2px]"
+          aria-hidden
+        >
+          <span className="block h-full w-full rounded-full bg-[#0c1b3a]/85 backdrop-blur-md" />
         </span>
+        {panelVisible ? (
+          <EyeOff className="relative h-5 w-5 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.9)] transition group-hover:scale-110" />
+        ) : (
+          <Eye className="relative h-5 w-5 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.9)] transition group-hover:scale-110" />
+        )}
       </button>
 
       <div className="relative z-10 flex min-h-dvh w-full flex-col lg:flex-row">
@@ -104,9 +112,9 @@ export function LoginPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 16 }}
                 transition={{ duration: 0.35 }}
-                className="max-w-md text-center lg:text-left"
+                className="w-full max-w-3xl text-center lg:text-left"
               >
-                <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-lg sm:text-5xl">
+                <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_6px_24px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl xl:text-8xl">
                   Qualité.
                   <br />
                   Rapidité.
