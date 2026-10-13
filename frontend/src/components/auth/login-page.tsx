@@ -108,11 +108,11 @@ export function LoginPage() {
             ) : (
               <motion.div
                 key="slogan"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 24 }}
                 transition={{ duration: 0.35 }}
-                className="w-full max-w-3xl text-center lg:text-left"
+                className="w-full max-w-3xl text-center lg:ml-auto lg:pr-6 lg:text-right xl:pr-12"
               >
                 <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_6px_24px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl xl:text-8xl">
                   Qualité.
