@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PackageCheck,
   Receipt,
   Scale,
   Settings,
@@ -79,6 +80,7 @@ const groups: NavGroup[] = [
     children: [
       { label: "Fiche Client", href: "/dashboard/clients/fiches", icon: Users },
       { label: "Devis", href: "/dashboard/clients/devis", icon: ClipboardList },
+      { label: "Bon Livraison", href: "/dashboard/clients/bons-livraison", icon: PackageCheck },
       { label: "Facture Vente", href: "/dashboard/clients/factures", icon: FileText },
       { label: "Règlement", href: "/dashboard/clients/reglements", icon: Wallet },
       { label: "Balance", href: "/dashboard/clients/balance", icon: Scale },

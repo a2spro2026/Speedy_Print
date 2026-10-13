@@ -6,6 +6,7 @@ import {
 } from "@/lib/clients";
 import { readJsonStore, writeJsonStore } from "@/lib/business-store";
 import type { Devis } from "@/lib/devis";
+import { qteLivreeProduit, type BonLivraison } from "@/lib/bons-livraison";
 
 export type TypeFacture = "Exonéré" | "HT" | "TTC";
 export type BaseFacture = "Vente" | "Avoir";
@@ -19,6 +20,8 @@ export type LigneFactureVente = {
   remise: number; // %
   tva: number; // %
   sousTotal: number;
+  /** BL d'origine : la sortie de stock est déjà comptée par le BL. */
+  blId?: string;
 };
 
 export type FactureVente = {
@@ -37,6 +40,7 @@ export type FactureVente = {
   lignes: LigneFactureVente[];
   montantFacture: number;
   devisId?: string; // DV-xxxx si converti depuis un devis
+  blIds?: string[]; // BL-xxxx si converti depuis un ou plusieurs BL
 };
 
 const STORAGE_KEY = "speedyprint.factures-vente";
@@ -257,6 +261,60 @@ export function factureFromDevis(
   };
 }
 
+export function factureForBl(
+  blId: string,
+  existing: FactureVente[]
+): FactureVente | undefined {
+  return existing.find((f) => f.blIds?.includes(blId));
+}
+
+export function isBlConverted(
+  blId: string,
+  existing: FactureVente[]
+): boolean {
+  return !!factureForBl(blId, existing);
+}
+
+/** Crée une facture vente à partir d'un ou plusieurs BL du même client. */
+export function factureFromBons(
+  bons: BonLivraison[],
+  existing: FactureVente[]
+): FactureVente {
+  const ordered = [...bons].sort((a, b) => a.date.localeCompare(b.date));
+  const last = ordered[ordered.length - 1];
+  const lignes: LigneFactureVente[] = ordered.flatMap((b) =>
+    (b.lignes ?? []).map((l) => ({
+      ref: l.ref ?? "",
+      designation: l.designation,
+      qte: Number(l.qte) || 0,
+      unite: l.unite,
+      prixU: Number(l.prixU) || 0,
+      remise: Number(l.remise) || 0,
+      tva: Number(l.tva) || 0,
+      sousTotal: Number(l.sousTotal) || 0,
+      blId: b.id,
+    }))
+  );
+
+  return {
+    id: nextFactureVenteId(existing),
+    mois: last.mois,
+    date: last.date,
+    typeFacture: last.typeFacture,
+    base: "Vente",
+    numeroFacture: nextNumeroFacture(existing, last.date),
+    bonCmdNumero: "BC-",
+    clientId: last.clientId,
+    nomClient: last.nomClient,
+    ice: last.ice ?? "",
+    typeReglement: last.typeReglement,
+    echeance: last.echeance,
+    lignes: lignes.length ? lignes : [emptyLigne()],
+    montantFacture: totalFacture(lignes),
+    blIds: ordered.map((b) => b.id),
+  };
+}
+
 export function calcSousTotal(args: {
   qte: number;
   prixU: number;
@@ -338,14 +396,18 @@ export function normalizeBonCmdNumero(raw: string): string {
   return s ? `BC-${s}` : "BC-";
 }
 
-/** Qté vendue d'un produit (réf) depuis les factures de vente. Avoir = négatif. */
+/**
+ * Qté sortie d'un produit (réf) : BL + factures de vente. Avoir = négatif.
+ * Les lignes de facture issues d'un BL sont ignorées (déjà comptées au BL).
+ */
 export function qteVendueProduit(produitRef: string): number {
   const ref = produitRef.trim().toLowerCase();
   if (!ref) return 0;
-  let total = 0;
+  let total = qteLivreeProduit(produitRef);
   for (const f of loadFacturesVente()) {
     const sign = f.base === "Avoir" ? -1 : 1;
     for (const l of f.lignes ?? []) {
+      if (l.blId) continue;
       if ((l.ref || "").trim().toLowerCase() === ref) {
         total += sign * (Number(l.qte) || 0);
       }

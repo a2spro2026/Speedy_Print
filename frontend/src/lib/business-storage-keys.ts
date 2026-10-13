@@ -3,6 +3,7 @@ export const BUSINESS_STORAGE_KEYS = [
   "speedyprint.clients",
   "speedyprint.fournisseurs",
   "speedyprint.devis",
+  "speedyprint.bons-livraison",
   "speedyprint.factures-achat",
   "speedyprint.bons-commande-achat",
   "speedyprint.factures-vente",

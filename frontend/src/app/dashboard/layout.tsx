@@ -21,6 +21,10 @@ const titles: Record<string, { title: string; subtitle: string }> = {
     title: "Saisie Nouveau Devis",
     subtitle: "",
   },
+  "/dashboard/clients/bons-livraison": {
+    title: "Saisie Bon de Livraison",
+    subtitle: "",
+  },
   "/dashboard/clients/factures": {
     title: "Saisie Nouvelle Facture",
     subtitle: "",

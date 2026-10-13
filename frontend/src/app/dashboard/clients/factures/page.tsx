@@ -42,6 +42,7 @@ import {
   loadDevis,
   type Devis,
 } from "@/lib/devis";
+import { loadBonsLivraison, type BonLivraison } from "@/lib/bons-livraison";
 import {
   downloadFactureVente,
   printFactureVente,
@@ -53,8 +54,10 @@ import {
   UNITES,
   calcSousTotal,
   emptyLigne,
+  factureFromBons,
   factureFromDevis,
   formatDateFR,
+  isBlConverted,
   isDevisConverted,
   loadFacturesVente,
   moisFromDate,
@@ -85,6 +88,7 @@ const ligneSchema = z.object({
   remise: z.string().min(1),
   tva: z.string().min(1),
   sousTotal: z.string(),
+  blId: z.string().optional(),
 });
 
 const schema = z.object({
@@ -144,6 +148,7 @@ function ligneToForm(l: ReturnType<typeof emptyLigne>) {
     remise: toMoneyInput(l.remise),
     tva: toMoneyInput(l.tva),
     sousTotal: toMoneyInput(l.sousTotal),
+    blId: l.blId ?? "",
   };
 }
 
@@ -205,6 +210,10 @@ export default function FactureVentePage() {
   const [printTarget, setPrintTarget] = useState<FactureVente | null>(null);
   const [importPanelOpen, setImportPanelOpen] = useState(false);
   const [pendingDevisId, setPendingDevisId] = useState<string | null>(null);
+  const [blList, setBlList] = useState<BonLivraison[]>([]);
+  const [pendingBlIds, setPendingBlIds] = useState<string[]>([]);
+  const [importTab, setImportTab] = useState<"devis" | "bl">("devis");
+  const [selectedBlIds, setSelectedBlIds] = useState<string[]>([]);
   const moisOpts = useMemo(() => moisOptions(), []);
   const catalogItems = useMemo(
     () => buildCatalogSuggestItems(produits, services),
@@ -224,6 +233,24 @@ export default function FactureVentePage() {
           return b.date.localeCompare(a.date);
         }),
     [devisList, list, pendingDevisId]
+  );
+
+  const blImportables = useMemo(
+    () =>
+      [...blList]
+        .filter(
+          (b) => !isBlConverted(b.id, list) && !pendingBlIds.includes(b.id)
+        )
+        .sort((a, b) => {
+          if (a.date === b.date) return b.id.localeCompare(a.id);
+          return b.date.localeCompare(a.date);
+        }),
+    [blList, list, pendingBlIds]
+  );
+
+  const selectedBlClientId = useMemo(
+    () => blList.find((b) => b.id === selectedBlIds[0])?.clientId ?? null,
+    [blList, selectedBlIds]
   );
 
   const {
@@ -393,6 +420,7 @@ export default function FactureVentePage() {
       lignes: [ligneToForm(emptyLigne())],
     });
     setPendingDevisId(null);
+    setPendingBlIds([]);
     setImportPanelOpen(false);
     setDevisList(loadDevis());
     setMode("create");
@@ -401,6 +429,7 @@ export default function FactureVentePage() {
   function openView(f: FactureVente) {
     reset(toFormValues(f));
     setPendingDevisId(f.devisId ?? null);
+    setPendingBlIds(f.blIds ?? []);
     setImportPanelOpen(false);
     setMode("view");
   }
@@ -408,6 +437,7 @@ export default function FactureVentePage() {
   function openEdit(f: FactureVente) {
     reset(toFormValues(f));
     setPendingDevisId(f.devisId ?? null);
+    setPendingBlIds(f.blIds ?? []);
     setImportPanelOpen(false);
     setMode("edit");
   }
@@ -415,12 +445,15 @@ export default function FactureVentePage() {
   function closeForm() {
     setMode(null);
     setPendingDevisId(null);
+    setPendingBlIds([]);
     setImportPanelOpen(false);
   }
 
   function openImportPanel() {
     setDevisList(loadDevis());
+    setBlList(loadBonsLivraison());
     setList(loadFacturesVente());
+    setSelectedBlIds([]);
     setImportPanelOpen(true);
   }
 
@@ -435,8 +468,42 @@ export default function FactureVentePage() {
       numeroFacture: currentNumero || draft.numeroFacture,
     });
     setPendingDevisId(d.id);
+    setPendingBlIds([]);
     setImportPanelOpen(false);
     toast.success(`Devis « ${d.numeroDevis} » importé.`);
+  }
+
+  function toggleBlSelection(b: BonLivraison) {
+    setSelectedBlIds((prev) =>
+      prev.includes(b.id) ? prev.filter((id) => id !== b.id) : [...prev, b.id]
+    );
+  }
+
+  function importFromBons() {
+    if (mode !== "create") return;
+    const bons = blList.filter((b) => selectedBlIds.includes(b.id));
+    if (bons.length === 0) return;
+    if (new Set(bons.map((b) => b.clientId)).size > 1) {
+      toast.error("Les BL sélectionnés doivent appartenir au même client.");
+      return;
+    }
+    const draft = factureFromBons(bons, list);
+    const currentId = getValues("id");
+    const currentNumero = getValues("numeroFacture");
+    reset({
+      ...toFormValues(draft),
+      id: currentId || draft.id,
+      numeroFacture: currentNumero || draft.numeroFacture,
+    });
+    setPendingBlIds(bons.map((b) => b.id));
+    setPendingDevisId(null);
+    setSelectedBlIds([]);
+    setImportPanelOpen(false);
+    toast.success(
+      bons.length === 1
+        ? `BL « ${bons[0].numeroBL} » importé.`
+        : `${bons.length} BL importés.`
+    );
   }
 
   function onClientChange(id: string) {
@@ -519,6 +586,7 @@ export default function FactureVentePage() {
         remise,
         tva,
         sousTotal,
+        ...(l.blId ? { blId: l.blId } : {}),
       };
     });
 
@@ -545,6 +613,9 @@ export default function FactureVentePage() {
       lignes,
       montantFacture: totalFacture(lignes),
       devisId: pendingDevisId || list.find((x) => x.id === values.id)?.devisId,
+      blIds: pendingBlIds.length
+        ? pendingBlIds
+        : list.find((x) => x.id === values.id)?.blIds,
     };
 
     if (mode === "create") {
@@ -553,6 +624,7 @@ export default function FactureVentePage() {
       saveFacturesVente(next);
       syncClientSoldeOnFactureCreate(row);
       setPendingDevisId(null);
+      setPendingBlIds([]);
       setImportPanelOpen(false);
       toast.success("Facture enregistrée.");
       setMode(null);
@@ -682,8 +754,15 @@ export default function FactureVentePage() {
                     Devis importé — il n&apos;apparaît plus dans la liste
                     d&apos;import.
                   </span>
+                ) : pendingBlIds.length > 0 ? (
+                  <span className="font-medium text-brand">
+                    {pendingBlIds.length === 1
+                      ? "1 BL importé"
+                      : `${pendingBlIds.length} BL importés`}{" "}
+                    — le stock est déjà sorti par le BL.
+                  </span>
                 ) : (
-                  "Vous pouvez importer un devis existant."
+                  "Vous pouvez importer un devis ou un ou plusieurs BL."
                 )}
               </div>
               <Button
@@ -924,6 +1003,10 @@ export default function FactureVentePage() {
                         <input
                           type="hidden"
                           {...register(`lignes.${index}.kind`)}
+                        />
+                        <input
+                          type="hidden"
+                          {...register(`lignes.${index}.blId`)}
                         />
                         {errors.lignes?.[index]?.designation && (
                           <p className="mt-0.5 text-[10px] text-rose-600">
@@ -1210,10 +1293,10 @@ export default function FactureVentePage() {
                     id="import-devis-title"
                     className="text-base font-bold text-ink"
                   >
-                    Importer un devis
+                    Importer dans la facture
                   </h2>
                   <p className="text-xs text-muted">
-                    Sélectionnez un devis — il disparaîtra de cette liste.
+                    Un devis, ou un ou plusieurs BL du même client.
                   </p>
                 </div>
               </div>
@@ -1227,6 +1310,128 @@ export default function FactureVentePage() {
               </button>
             </div>
 
+            <div className="border-b border-slate-200 px-4 py-2">
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                {(
+                  [
+                    ["devis", `Devis (${devisImportables.length})`],
+                    ["bl", `Bons de livraison (${blImportables.length})`],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setImportTab(key)}
+                    aria-pressed={importTab === key}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                      importTab === key
+                        ? "bg-white text-ink shadow-sm"
+                        : "text-slate-500 hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {importTab === "bl" ? (
+              <>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <table className="w-full min-w-[640px] border-collapse text-center text-sm">
+                    <thead className="sticky top-0 bg-slate-900 text-white">
+                      <tr>
+                        <th className="w-[48px] px-3 py-3" />
+                        <th className="px-3 py-3 text-[12px] font-bold">Date</th>
+                        <th className="px-3 py-3 text-[12px] font-bold">N° BL</th>
+                        <th className="px-3 py-3 text-[12px] font-bold">Client</th>
+                        <th className="px-3 py-3 text-[12px] font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {blImportables.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="px-4 py-12 text-center text-sm text-muted"
+                          >
+                            Aucun BL à facturer.
+                          </td>
+                        </tr>
+                      ) : (
+                        blImportables.map((b, i) => {
+                          const checked = selectedBlIds.includes(b.id);
+                          const otherClient =
+                            !!selectedBlClientId &&
+                            b.clientId !== selectedBlClientId;
+                          return (
+                            <tr
+                              key={b.id}
+                              onClick={() => !otherClient && toggleBlSelection(b)}
+                              className={`border-t border-slate-100 ${
+                                otherClient
+                                  ? "cursor-not-allowed opacity-40"
+                                  : "cursor-pointer hover:bg-blue-50/50"
+                              } ${
+                                checked
+                                  ? "bg-brand/5"
+                                  : i % 2 === 0
+                                    ? "bg-white"
+                                    : "bg-slate-50/60"
+                              }`}
+                            >
+                              <td className="px-3 py-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={otherClient}
+                                  onChange={() => toggleBlSelection(b)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Sélectionner ${b.numeroBL}`}
+                                  className="h-4 w-4 accent-[#2563EB]"
+                                />
+                              </td>
+                              <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                                {formatDateFR(b.date)}
+                              </td>
+                              <td className="px-3 py-2.5 font-semibold">
+                                {b.numeroBL}
+                              </td>
+                              <td className="px-3 py-2.5 font-semibold text-ink">
+                                {b.nomClient}
+                              </td>
+                              <td className={`px-3 py-2.5 ${moneyTone.facture}`}>
+                                {formatMoney(b.montantFacture)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                  <span className="text-xs text-muted">
+                    {selectedBlIds.length === 0
+                      ? "Cochez un ou plusieurs BL du même client."
+                      : `${selectedBlIds.length} BL sélectionné(s) · ${formatMoney(
+                          blList
+                            .filter((b) => selectedBlIds.includes(b.id))
+                            .reduce((s, b) => s + (Number(b.montantFacture) || 0), 0)
+                        )}`}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={selectedBlIds.length === 0}
+                    onClick={importFromBons}
+                  >
+                    <Import className="h-4 w-4" />
+                    Importer la sélection
+                  </Button>
+                </div>
+              </>
+            ) : (
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full min-w-[640px] border-collapse text-center text-sm">
                 <thead className="sticky top-0 bg-slate-900 text-white">
@@ -1283,6 +1488,7 @@ export default function FactureVentePage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         </div>
       )}
