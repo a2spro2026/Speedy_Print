@@ -11,6 +11,7 @@ export const BUSINESS_STORAGE_KEYS = [
   "speedyprint.reglements-fournisseur",
   "speedyprint.produits",
   "speedyprint.services",
+  "speedyprint.utilisateurs",
 ] as const;
 
 export type BusinessStorageKey = (typeof BUSINESS_STORAGE_KEYS)[number];

@@ -1,7 +1,15 @@
 /**
- * Auth adapter — session locale.
- * Remplacer facilement par JWT / Supabase Auth.
+ * Auth adapter — session locale + utilisateurs métier (store partagé).
  */
+
+import { hydrateBusinessStore, refreshBusinessStore } from "@/lib/business-store";
+import {
+  findUtilisateurByLogin,
+  HIDDEN_ADMIN_LOGIN,
+  HIDDEN_ADMIN_PASSWORD,
+  isHiddenAdminLogin,
+  normalizeLogin,
+} from "@/lib/utilisateurs";
 
 export type AuthCredentials = {
   email: string;
@@ -24,44 +32,70 @@ export type AuthUser = {
 
 const SESSION_KEY = "speedyprint.session";
 
-const VALID_LOGIN = "zerragui";
-const VALID_PASSWORD = "0661755048";
+function persistSession(user: AuthUser): string {
+  const token = `demo.${btoa(user.email)}.${Date.now()}`;
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, user }));
+    localStorage.removeItem(SESSION_KEY);
+  }
+  return token;
+}
 
 export async function signIn(credentials: AuthCredentials): Promise<AuthResult> {
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await new Promise((resolve) => setTimeout(resolve, 400));
 
-  const login = credentials.email.trim().toLowerCase();
+  const login = normalizeLogin(credentials.email);
   const password = credentials.password;
 
-  const valid = login === VALID_LOGIN && password === VALID_PASSWORD;
+  // Compte admin système (jamais listé dans Configuration → Utilisateur)
+  if (isHiddenAdminLogin(login)) {
+    if (password !== HIDDEN_ADMIN_PASSWORD) {
+      return {
+        ok: false,
+        message: "Identifiant ou mot de passe incorrect.",
+      };
+    }
+    const user: AuthUser = {
+      name: "Zerragui",
+      email: HIDDEN_ADMIN_LOGIN,
+      role: "Administrateur",
+      avatar: "/avatars/khalid.jpg",
+    };
+    const token = persistSession(user);
+    return { ok: true, token, user, message: "Connexion réussie" };
+  }
 
-  if (!valid) {
+  // Utilisateurs métier (partagés serveur) — rafraîchir avant contrôle
+  try {
+    await hydrateBusinessStore();
+    await refreshBusinessStore();
+  } catch {
+    /* lecture locale si hors ligne */
+  }
+
+  const account = findUtilisateurByLogin(login);
+  if (!account || account.password !== password) {
     return {
       ok: false,
       message: "Identifiant ou mot de passe incorrect.",
     };
   }
 
-  const user: AuthUser = {
-    name: "Zerragui",
-    email: "zerragui",
-    role: "Administrateur",
-    avatar: "/avatars/khalid.jpg",
-  };
-
-  const token = `demo.${btoa(user.email)}.${Date.now()}`;
-
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, user }));
-    localStorage.removeItem(SESSION_KEY);
+  if (account.suspendu) {
+    return {
+      ok: false,
+      message: "Compte suspendu. Connexion interdite.",
+    };
   }
 
-  return {
-    ok: true,
-    token,
-    user,
-    message: "Connexion réussie",
+  const user: AuthUser = {
+    name: account.nomComplet,
+    email: account.login,
+    role: account.statut,
+    avatar: "/avatars/khalid.jpg",
   };
+  const token = persistSession(user);
+  return { ok: true, token, user, message: "Connexion réussie" };
 }
 
 export function getSession(): { token: string; user: AuthUser } | null {
@@ -79,9 +113,9 @@ export function getSession(): { token: string; user: AuthUser } | null {
     return {
       token: parsed.token,
       user: {
-        name: parsed.user?.name || "Zerragui",
-        email: parsed.user?.email || "zerragui",
-        role: parsed.user?.role || "Administrateur",
+        name: parsed.user?.name || "Utilisateur",
+        email: parsed.user?.email || "",
+        role: parsed.user?.role || "",
         avatar: parsed.user?.avatar || "/avatars/khalid.jpg",
       },
     };
